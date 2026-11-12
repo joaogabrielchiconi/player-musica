@@ -269,12 +269,14 @@ Mini player fixo embaixo, que abre o player em tela cheia com a fila.
 O player passa a tocar do `audio` quando a faixa está baixada.
 
 **Critérios de aceite:**
-- [ ] Um álbum baixado toca inteiro em modo avião, com a tela bloqueada.
-- [ ] Apagar um download reduz o espaço mostrado no painel.
-- [ ] Um download interrompido (internet caiu) não deixa um arquivo pela metade marcado como baixado.
+- [x] Um álbum baixado toca inteiro em modo avião, com a tela bloqueada.
+- [x] Apagar um download reduz o espaço mostrado no painel.
+- [x] Um download interrompido (internet caiu) não deixa um arquivo pela metade marcado como baixado. (`tests/offline.test.js`)
 
 **Verificação:**
-- [ ] Manual no iPhone: baixar, entrar em modo avião, ouvir, apagar.
+- [x] Manual no iPhone: baixar, entrar em modo avião, ouvir, apagar.
+
+**Resultado (12/11/2026):** aprovado no iPhone ("Deu certo"). O arquivo só é gravado inteiro e com o tamanho do Drive; a fila para sem internet/login e continua depois. Sem internet, tocar uma baixada monta a fila só com as baixadas.
 
 **Depende de:** T9 · **Arquivos:** `js/offline.js`, `js/player.js`, `js/ui.js`, `index.html` · **Tamanho:** M
 
