@@ -169,13 +169,15 @@ Também mede o tempo entre o toque e o início do som.
 - Tocar numa faixa ainda chama o player do protótipo.
 
 **Critérios de aceite:**
-- [ ] As 3 abas listam a biblioteca, e o álbum mostra as faixas em ordem, com a capa.
-- [ ] Buscar "jose" encontra "José".
-- [ ] Uma lista com 2000 faixas rola sem travar no iPhone.
+- [x] As 3 abas listam a biblioteca, e o álbum mostra as faixas em ordem, com a capa.
+- [x] Buscar "jose" encontra "José".
+- [ ] Uma lista com 2000 faixas rola sem travar no iPhone. (Testado com 2000 faixas falsas só no navegador do PC; `content-visibility: auto` nas linhas. Reconferir no iPhone quando a biblioteca crescer.)
 
 **Verificação:**
-- [ ] `node --test tests/library.test.js`
-- [ ] Manual: navegar pelas abas no iPhone.
+- [x] `node --test tests/library.test.js`
+- [x] Manual: navegar pelas abas no iPhone.
+
+**Resultado (12/11/2026):** aprovado no iPhone ("Deu certo"). Tocar numa faixa toca só ela (atalho até a T7). As capas reais não foram testadas: as músicas atuais não têm capa nas tags.
 
 **Depende de:** T5 · **Arquivos:** `index.html`, `js/ui.js`, `js/library.js`, `css/app.css`, `tests/library.test.js` · **Tamanho:** M
 
