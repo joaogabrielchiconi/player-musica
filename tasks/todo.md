@@ -52,7 +52,11 @@ Também mede o tempo entre o toque e o início do som.
 
 **Depende de:** T0 · **Arquivos:** `proto/index.html`, `proto/proto.js`, `manifest.webmanifest`, `icons/icon-180.png` · **Tamanho:** M
 
-**Resultados:** fluxo de login: ___ · tempo até tocar (Wi-Fi / 4G): ___ / ___ · tela bloqueada: ___
+**Resultados (12/11/2026, app instalado no iPhone):**
+- **Tela bloqueada:** a v1 trocava de faixa sem som. A v2 funcionou com `navigator.audioSession.type = 'playback'` e dois elementos `<audio>` (a próxima faixa começa cerca de 1 s antes do fim da atual). **As duas medidas são obrigatórias no app final.**
+- **Tela de bloqueio:** mostrava ±10 s. A v3 tira os controles nativos e não registra `seekbackward`/`seekforward`; ainda não foi testada.
+- **Tempo até tocar:** faixa pré-carregada 0,0 s. Faixa de 111 MB baixou em 11,3 s no Wi-Fi. O 4G ainda não foi medido.
+- **Fluxo de login:** ___ (redirecionamento ou popup).
 
 ### Checkpoint: Go/no-go
 - [ ] Os critérios 2 e 3 da spec passam no app instalado.

@@ -52,7 +52,14 @@
     <label><input type="checkbox" id="optTwo"> Dois elementos de áudio (sobreposição)</label>
   </fieldset>
 
-  <audio id="audio" controls playsinline></audio>
+  <!-- sem "controls": os controles nativos parecem trazer os botões de ±10 s para a tela de bloqueio -->
+  <audio id="audio" playsinline></audio>
+  <div class="row" style="align-items:center">
+    <button id="prev" aria-label="Música anterior">⏮</button>
+    <button id="playPause" aria-label="Tocar ou pausar">▶︎</button>
+    <button id="next" aria-label="Próxima música">⏭</button>
+    <span class="muted" id="time">0:00 / 0:00</span>
+  </div>
   <ol id="tracks"></ol>
 
   <div class="row">
@@ -60,6 +67,6 @@
   </div>
   <div id="log" aria-live="polite"></div>
 
-  <script type="module" src="proto.js?v=2"></script>
+  <script type="module" src="proto.js?v=3"></script>
 </body>
 </html>
