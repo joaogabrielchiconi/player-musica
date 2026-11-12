@@ -48,3 +48,39 @@ export function withShuffle(q, shuffle, random = Math.random) {
   const idx = q.order[q.pos] ?? 0;
   return { ...q, shuffle, order: makeOrder(q.items.length, idx, shuffle, random), pos: shuffle ? 0 : idx };
 }
+
+// ---- estado salvo (T8): só IDs, posição e tempo; as faixas vêm do banco ao restaurar ----
+export function serializeState(q, time = 0, duration = 0) {
+  return { v: 1, ids: q.items.map((t) => t.id), order: q.order, pos: q.pos, shuffle: q.shuffle, repeat: q.repeat, time, duration };
+}
+
+/**
+ * Estado salvo -> { q, time, duration }, ou null se estiver corrompido ou a faixa atual não existir mais
+ * (o app abre com o player vazio). Faixas apagadas do meio da fila só saem da fila.
+ * @param {any} raw
+ * @param {Map<string, object>} byId  faixas atuais do banco
+ */
+export function restoreState(raw, byId) {
+  try {
+    if (!raw || raw.v !== 1 || !Array.isArray(raw.ids) || !Array.isArray(raw.order)) return null;
+    const items = [];
+    const remap = new Map(); // índice antigo -> novo
+    raw.ids.forEach((id, i) => {
+      const t = byId.get(id);
+      if (t) { remap.set(i, items.length); items.push(t); }
+    });
+    const order = raw.order.map((i) => remap.get(i)).filter((i) => i !== undefined);
+    const now = remap.get(raw.order[raw.pos]);
+    if (now === undefined) return null;
+    const time = Number.isFinite(raw.time) && raw.time > 0 ? raw.time : 0;
+    const duration = Number.isFinite(raw.duration) && raw.duration > 0 ? raw.duration : 0;
+    const q = {
+      items, order, pos: order.indexOf(now),
+      shuffle: raw.shuffle === true,
+      repeat: REPEAT_MODES.includes(raw.repeat) ? raw.repeat : 'off',
+    };
+    return { q, time, duration };
+  } catch {
+    return null;
+  }
+}

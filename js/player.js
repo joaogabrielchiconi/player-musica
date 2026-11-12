@@ -28,14 +28,16 @@ export function createPlayer({ audio, download, artUrl, fallbackArt, onUpdate, o
   let prefetch = null; // { pos, id, promise }
   let prepared = null; // { pos, id, el }: próxima faixa já carregada no elemento parado
   let advancing = false;
+  let pending = null; // { time, duration }: fila restaurada ao abrir, ainda sem áudio carregado
   const active = () => players[cur];
+  const time = () => (pending ? pending.time : active().currentTime || 0);
 
   const state = () => ({
     track: started ? current(q) : null,
-    playing: started && !active().paused,
+    playing: started && !pending && !active().paused,
     loading,
-    time: active().currentTime || 0,
-    duration: active().duration || 0,
+    time: time(),
+    duration: pending ? pending.duration : active().duration || 0,
     queue: q,
   });
   const emit = () => onUpdate(state());
@@ -94,9 +96,10 @@ export function createPlayer({ audio, download, artUrl, fallbackArt, onUpdate, o
     }
   }
 
-  async function playPos(pos) {
+  async function playPos(pos, startAt = 0) {
     const t = trackAt(q, pos);
     if (!t) { emit(); return; } // fim da fila
+    if (!startAt) pending = null; // faixa nova começa do zero; com startAt, o ponto salvo vale até ela tocar
     q = { ...q, pos };
     started = true;
     applyAudioSession();
@@ -113,12 +116,14 @@ export function createPlayer({ audio, download, artUrl, fallbackArt, onUpdate, o
         const blob = await (prefetch?.pos === pos && prefetch.id === t.id ? prefetch.promise : getBlob(t));
         if (current(q)?.id !== t.id || q.pos !== pos) return; // pulou para outra enquanto baixava
         el = players[1 - cur];
+        if (startAt > 0) el.addEventListener('loadedmetadata', () => { el.currentTime = startAt; }, { once: true });
         setSrc(el, blob);
       }
       prepared = null;
       prefetch = null;
       setMediaSession(t);
       cur = players.indexOf(el); // antes do play(), para os eventos do novo elemento contarem como ativos
+      pending = null;
       await el.play();
       if (el !== old) old.pause(); // só pausa a anterior depois que a nova já está tocando
       setPlaybackState('playing');
@@ -167,18 +172,22 @@ export function createPlayer({ audio, download, artUrl, fallbackArt, onUpdate, o
     if (pos >= 0) playPos(pos);
   }
   function prev() {
-    const r = prevPos(q, active().currentTime);
-    if (r.restart) active().currentTime = 0;
-    else playPos(r.pos);
+    const r = prevPos(q, time());
+    if (!r.restart) return playPos(r.pos);
+    if (pending) { pending.time = 0; emit(); } else active().currentTime = 0;
   }
   function play() {
     if (!started) return playPos(q.pos);
+    if (pending) return playPos(q.pos, pending.time); // baixa só agora e começa no ponto salvo
     applyAudioSession();
     return active().play().catch(onError);
   }
   function pause() { active().pause(); }
   function toggle() { return !started || active().paused ? play() : pause(); }
-  function seek(t) { if (started) active().currentTime = t; }
+  function seek(t) {
+    if (!started) return;
+    if (pending) { pending.time = t; emit(); } else active().currentTime = t;
+  }
 
   // Com previoustrack/nexttrack e sem seekbackward/seekforward, o iOS mostra ⏮ ⏭ em vez de ±10 s.
   function registerActions() {
@@ -206,6 +215,15 @@ export function createPlayer({ audio, download, artUrl, fallbackArt, onUpdate, o
   return {
     playList(list, index) { q = newQueue(list, index, { shuffle: q.shuffle, repeat: q.repeat }); prepared = null; prefetch = null; playPos(q.pos); },
     playAt(pos) { playPos(pos); },
+    // Reabre pausado no ponto salvo, sem baixar nada até o ▶.
+    restore(restoredQueue, t, duration) {
+      q = restoredQueue;
+      started = true;
+      pending = { time: t, duration };
+      prepared = null;
+      prefetch = null;
+      emit();
+    },
     next, prev, play, pause, toggle, seek,
     toggleShuffle() { q = withShuffle(q, !q.shuffle); queueChanged(); },
     cycleRepeat() { q = { ...q, repeat: nextRepeat(q.repeat) }; queueChanged(); },

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newQueue, current, nextPos, prevPos, withShuffle, nextRepeat, trackAt } from '../js/queue.js';
+import { newQueue, current, nextPos, prevPos, withShuffle, nextRepeat, trackAt, serializeState, restoreState } from '../js/queue.js';
 
 const items = ['a', 'b', 'c', 'd', 'e'];
 // Gerador previsível para o aleatório.
@@ -55,4 +55,37 @@ test('fila vazia: aleatório não inventa faixa', () => {
   assert.deepEqual(s.order, []);
   assert.equal(current(s), null);
   assert.equal(nextPos(s), -1);
+});
+
+// ---- estado salvo (T8) ----
+const objs = items.map((id) => ({ id }));
+const lib = new Map(objs.map((t) => [t.id, t]));
+const only = (...ids) => new Map(ids.map((id) => [id, { id }]));
+const ids = (q) => q.items.map((t) => t.id);
+
+test('estado: salvar e restaurar devolve a mesma fila, faixa e ponto', () => {
+  const q = newQueue(objs, 2, { shuffle: true, repeat: 'all' }, seeded(5));
+  const r = restoreState(JSON.parse(JSON.stringify(serializeState(q, 41.5, 200))), lib);
+  assert.deepEqual(r.q, q);
+  assert.equal(current(r.q).id, 'c');
+  assert.equal(r.time, 41.5);
+  assert.equal(r.duration, 200);
+});
+
+test('estado: faixa apagada do meio sai da fila; a atual continua a mesma', () => {
+  const r = restoreState(serializeState(newQueue(objs, 3), 10, 100), only('a', 'b', 'd', 'e'));
+  assert.deepEqual(ids(r.q), ['a', 'b', 'd', 'e']);
+  assert.equal(current(r.q).id, 'd');
+});
+
+test('estado: faixa atual que não existe mais, ou dado corrompido, vira player vazio', () => {
+  assert.equal(restoreState(serializeState(newQueue(objs, 2), 1, 1), only('a', 'b')), null);
+  for (const bad of [null, undefined, 'x', 42, {}, { v: 1 }, { v: 2, ids: [], order: [] }, { v: 1, ids: ['a'], order: ['z'], pos: 0 }, { v: 1, ids: ['a'], order: [0], pos: 9 }]) {
+    assert.equal(restoreState(bad, lib), null);
+  }
+});
+
+test('estado: tempo, repetir e aleatório inválidos viram valores seguros', () => {
+  const r = restoreState({ v: 1, ids: ['a', 'b'], order: [0, 1], pos: 1, time: -5, duration: 'x', repeat: 'tudo', shuffle: 'sim' }, lib);
+  assert.deepEqual([r.time, r.duration, r.q.repeat, r.q.shuffle, current(r.q).id], [0, 0, 'off', false, 'b']);
 });
