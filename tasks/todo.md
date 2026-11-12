@@ -352,6 +352,8 @@ Respeitar a área segura do iPhone (notch e barra inferior).
 **Verificação:**
 - [ ] Manual no iPhone, mais capturas de tela para aprovação.
 
+**Feito (12/11/2026, aguardando aprovação no iPhone):** direção "fita cassete (K7)" escolhida pelo dono entre 4 exemplos. PRODUCT.md, DESIGN.md e contrato da direção em `.impeccable/surfaces/`. `css/app.css`, `index.html` e `js/ui.js` refeitos; `js/dialogs.js` novo (troca `prompt`/`confirm` por diálogos do app); `js/app.js` só ganhou ligações de interface. Conferido por código: 44 pt em todas as telas, contraste mínimo 4,9:1, detector da skill sem achados. Não rodado: o revisor final por subagente da skill (feito só o autoexame). Nome do app agora "Músicas" no título da página; manifesto e ícone ficam para a T14.
+
 **Depende de:** T12 · **Arquivos:** `css/app.css`, `index.html`, `js/ui.js` · **Tamanho:** M
 
 ---

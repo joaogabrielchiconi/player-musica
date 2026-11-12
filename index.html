@@ -4,57 +4,114 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
-  <title>Player de Música</title>
+  <meta name="theme-color" content="#0E1626">
+  <meta name="apple-mobile-web-app-title" content="Músicas">
+  <title>Músicas</title>
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
+  <!-- Ícones desenhados: um traço só (2 px, pontas redondas). Usados com <svg class="ic"><use href="#i-nome"/></svg>. -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="18" cy="12" r="1.3" fill="currentColor"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1" fill="currentColor"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 5.5v13l9-6.5z" fill="currentColor"/><path d="M18.5 5.5v13"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18 5.5v13L9 12z" fill="currentColor"/><path d="M5.5 5.5v13"/></symbol>
+    <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M4 7h2.5c2.2 0 3.6 1.2 4.7 3.2"/><path d="M12.8 13.8C13.9 15.8 15.3 17 17.5 17H20"/><path d="M4 17h2.5c1.2 0 2.2-.5 3-1.3"/><path d="M13.5 8.3c.8-.8 1.9-1.3 3-1.3H20"/><path d="M18 4.5L20.5 7 18 9.5"/><path d="M18 14.5l2.5 2.5-2.5 2.5"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M17 3.5L20 7l-3 3.5"/><path d="M4 11v-1a3 3 0 0 1 3-3h13"/><path d="M7 20.5L4 17l3-3.5"/><path d="M20 13v1a3 3 0 0 1-3 3H4"/></symbol>
+    <symbol id="i-repeat-one" viewBox="0 0 24 24"><path d="M17 3.5L20 7l-3 3.5"/><path d="M4 11v-1a3 3 0 0 1 3-3h13"/><path d="M7 20.5L4 17l3-3.5"/><path d="M20 13v1a3 3 0 0 1-3 3H4"/><path d="M11 10.5l1.5-1v6"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4.5V9h-4.5"/></symbol>
+    <symbol id="i-cassette" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><circle cx="8.5" cy="11" r="2"/><circle cx="15.5" cy="11" r="2"/><path d="M7 16h10"/></symbol>
+  </svg>
+
   <header class="top">
-    <button id="back" class="back" hidden>‹ Voltar</button>
-    <h1 id="title">Músicas</h1>
-    <div class="actions">
-      <button id="signin" hidden>Entrar com Google</button>
-      <button id="sync" hidden>Atualizar biblioteca</button>
+    <button id="back" class="back-btn" type="button" hidden><svg class="ic"><use href="#i-chevron-left"/></svg><span>Voltar</span></button>
+    <div class="titlebar">
+      <h1 id="title">Músicas</h1>
+      <span id="count" class="label" hidden></span>
+      <span id="net" class="net" hidden>sem internet</span>
+      <button id="sync" class="icon-btn" type="button" hidden aria-label="Atualizar biblioteca"><svg class="ic"><use href="#i-refresh"/></svg></button>
     </div>
+    <button id="signin" class="btn primary wide" type="button" hidden>Entrar com Google</button>
+    <div id="syncbar" class="syncbar" role="progressbar" aria-label="Lendo as músicas novas" aria-valuemin="0" aria-valuemax="100" hidden><i></i></div>
     <p class="status" id="status" aria-live="polite"></p>
-    <input id="search" class="search" type="search" placeholder="Buscar música, artista ou álbum" aria-label="Buscar" autocomplete="off">
-    <label class="filter"><input id="onlyDownloaded" type="checkbox"> Só baixadas</label>
+    <input id="search" class="search" type="search" placeholder="Buscar música, artista ou álbum" aria-label="Buscar" autocomplete="off" enterkeyhint="search">
+    <label class="switch" id="filter"><input id="onlyDownloaded" type="checkbox"><span>Só baixadas</span></label>
   </header>
   <main id="library"></main>
   <p id="toast" class="toast" role="status" hidden></p>
   <footer class="bottom">
     <div class="mini" id="mini" hidden>
-      <button id="miniOpen" class="mini-info" aria-label="Abrir o player">
-        <span id="miniTitle" class="title"></span><span id="miniSub" class="sub"></span>
+      <button id="miniOpen" class="mini-info" type="button" aria-label="Abrir o player">
+        <svg class="mini-reels" viewBox="0 0 76 32" aria-hidden="true">
+          <path class="run" d="M21 16H55"/>
+          <g transform="translate(16 16)"><circle class="tape tape-l" r="14"/><g class="hub"><circle class="ring" r="5.5"/><path class="spokes" d="M0-4V-2M0 2V4M3.5-2L1.7-1M-1.7 1L-3.5 2M3.5 2L1.7 1M-1.7-1L-3.5-2"/></g></g>
+          <g transform="translate(60 16)"><circle class="tape tape-r" r="14"/><g class="hub"><circle class="ring" r="5.5"/><path class="spokes" d="M0-4V-2M0 2V4M3.5-2L1.7-1M-1.7 1L-3.5 2M3.5 2L1.7 1M-1.7-1L-3.5-2"/></g></g>
+        </svg>
+        <span class="mini-text"><span id="miniTitle" class="title"></span><span id="miniSub" class="sub"></span></span>
       </button>
-      <button id="miniToggle" aria-label="Pausar">⏸︎</button>
-      <button id="miniNext" aria-label="Próxima">⏭︎</button>
+      <button id="miniToggle" class="icon-btn" type="button" aria-label="Pausar"><svg class="ic"><use href="#i-pause"/></svg></button>
+      <button id="miniNext" class="icon-btn" type="button" aria-label="Próxima"><svg class="ic"><use href="#i-next"/></svg></button>
     </div>
-    <nav class="tabs" role="tablist">
-      <button role="tab" data-tab="songs" aria-selected="true">Músicas</button>
-      <button role="tab" data-tab="artists" aria-selected="false">Artistas</button>
-      <button role="tab" data-tab="albums" aria-selected="false">Álbuns</button>
-      <button role="tab" data-tab="playlists" aria-selected="false">Playlists</button>
-      <button role="tab" data-tab="downloads" aria-selected="false">Baixadas</button>
+    <nav class="tabs" role="tablist" aria-label="Seções">
+      <button role="tab" type="button" data-tab="songs" aria-selected="true">Músicas</button>
+      <button role="tab" type="button" data-tab="artists" aria-selected="false">Artistas</button>
+      <button role="tab" type="button" data-tab="albums" aria-selected="false">Álbuns</button>
+      <button role="tab" type="button" data-tab="playlists" aria-selected="false">Playlists</button>
+      <button role="tab" type="button" data-tab="downloads" aria-selected="false">Baixadas</button>
     </nav>
   </footer>
   <section id="full" class="full" hidden aria-label="Tocando agora">
-    <button id="fullClose" class="back">⌄ Fechar</button>
-    <div class="full-cover" id="fullCover"></div>
-    <p id="fullTitle" class="full-title"></p>
-    <p id="fullSub" class="sub"></p>
+    <div class="full-top">
+      <button id="fullClose" class="icon-btn" type="button" aria-label="Fechar o player"><svg class="ic"><use href="#i-chevron-down"/></svg></button>
+      <h2 class="full-head">Tocando agora</h2>
+    </div>
+    <div class="full-art" id="fullCover">
+      <div class="cassette" id="cassette">
+        <div class="cass-label"><span id="fullAlbum"></span></div>
+        <svg class="cass-win" viewBox="0 0 160 64" aria-hidden="true">
+          <rect class="win" x="4" y="4" width="152" height="56" rx="28"/>
+          <g transform="translate(46 32)"><circle class="tape tape-l" r="24"/><g class="hub"><circle class="ring" r="9"/><path class="spokes" d="M0-7V-3.5M0 3.5V7M6-3.5L3-1.7M-3 1.7L-6 3.5M6 3.5L3 1.7M-3-1.7L-6-3.5"/></g></g>
+          <g transform="translate(114 32)"><circle class="tape tape-r" r="24"/><g class="hub"><circle class="ring" r="9"/><path class="spokes" d="M0-7V-3.5M0 3.5V7M6-3.5L3-1.7M-3 1.7L-6 3.5M6 3.5L3 1.7M-3-1.7L-6-3.5"/></g></g>
+        </svg>
+      </div>
+    </div>
+    <div class="full-info">
+      <p id="fullTitle" class="full-title"></p>
+      <p id="fullSub" class="sub"></p>
+    </div>
     <input id="seek" class="seek" type="range" min="0" max="0" step="1" value="0" aria-label="Posição na música">
-    <div class="times"><span id="tNow">0:00</span><span id="tEnd">0:00</span></div>
+    <div class="times mono"><span id="tNow">0:00</span><span id="tEnd">0:00</span></div>
     <div class="controls">
-      <button id="shuffle" aria-pressed="false" aria-label="Aleatório">🔀︎</button>
-      <button id="prev" aria-label="Anterior">⏮︎</button>
-      <button id="toggle" class="big" aria-label="Pausar">⏸︎</button>
-      <button id="next" aria-label="Próxima">⏭︎</button>
-      <button id="repeat" aria-pressed="false" aria-label="Repetir: desligado">🔁︎</button>
+      <button id="shuffle" class="ctrl" type="button" aria-pressed="false" aria-label="Aleatório"><svg class="ic"><use href="#i-shuffle"/></svg></button>
+      <button id="prev" class="ctrl" type="button" aria-label="Anterior"><svg class="ic"><use href="#i-prev"/></svg></button>
+      <button id="toggle" class="ctrl big" type="button" aria-label="Pausar"><svg class="ic"><use href="#i-pause"/></svg></button>
+      <button id="next" class="ctrl" type="button" aria-label="Próxima"><svg class="ic"><use href="#i-next"/></svg></button>
+      <button id="repeat" class="ctrl" type="button" aria-pressed="false" aria-label="Repetir: desligado"><svg class="ic"><use href="#i-repeat"/></svg></button>
     </div>
     <h2 class="queue-head">Fila</h2>
     <ol id="queue" class="tracks queue"></ol>
   </section>
   <audio id="audio" playsinline preload="auto"></audio>
+
+  <!-- Modelo de linha de música: a lista clona isto (mais leve que montar cada linha do zero). -->
+  <template id="row-tpl">
+    <li class="row" tabindex="0">
+      <span class="lead mono"></span>
+      <div class="meta"><span class="title"></span><span class="sub"></span></div>
+      <button class="dl" type="button" data-act="dl"><svg class="ic"><use href="#i-download"/></svg><span class="pct mono"></span></button>
+      <button class="add" type="button" data-act="add"><svg class="ic"><use href="#i-plus"/></svg></button>
+    </li>
+  </template>
+
   <!-- Esta página também é o retorno do login do Google (REDIRECT_URI): app.js trata isso primeiro. -->
   <script type="module" src="js/app.js"></script>
 </body>

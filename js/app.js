@@ -8,12 +8,22 @@ import { createPlayer } from './player.js';
 import { serializeState, restoreState } from './queue.js';
 import { createOffline } from './offline.js';
 import { createPlaylists, tracksOf, createPlaylistBackup } from './playlists.js';
+import { confirmDialog } from './dialogs.js';
 
 const $ = (id) => document.getElementById(id);
 const drive = createDrive({ getToken, onUnauthorized: () => { clearToken(); return null; } });
 let syncing = false;
 
 function setStatus(text) { $('status').textContent = text; }
+
+// Barra fina do cabeçalho enquanto lê as músicas novas (fração de 0 a 1; null esconde).
+function setSyncBar(fraction) {
+  const bar = $('syncbar');
+  bar.hidden = fraction == null;
+  if (fraction == null) return;
+  bar.style.setProperty('--w', `${Math.round(fraction * 100)}%`);
+  bar.setAttribute('aria-valuenow', String(Math.round(fraction * 100)));
+}
 
 function refreshButtons() {
   const signedIn = Boolean(getToken());
@@ -62,6 +72,7 @@ const isNetworkError = (err) => err instanceof TypeError; // fetch sem rede reje
 function setOnline(value) {
   if (value === online) return;
   online = value;
+  $('net').hidden = online;
   setStatus(online ? '' : 'Sem internet: só as músicas baixadas tocam.');
   if (online) {
     offline.resume(); // downloads parados pela queda continuam
@@ -119,15 +130,19 @@ const downloads = {
     const n = offline.enqueue(list);
     toast(n ? `${n} música(s) na fila para baixar.` : 'Já está tudo baixado.');
   },
-  toggle(t) {
+  async toggle(t) {
     const s = offline.state(t.id);
-    if (s === 'done') { if (confirm(`Apagar o download de "${t.title}"?`)) offline.remove([t.id]); }
-    else if (s === 'queued') offline.remove([t.id]);
+    if (s === 'done') {
+      const ok = await confirmDialog({ title: `Apagar o download de "${t.title}"?`, text: 'A música continua na biblioteca. Para ouvir sem internet, é preciso baixar de novo.', confirmLabel: 'Apagar download' });
+      if (ok) offline.remove([t.id]);
+    } else if (s === 'queued') offline.remove([t.id]);
     else if (!s) downloads.add([t]);
   },
-  removeAll(list) {
+  async removeAll(list) {
     const ids = list.filter((t) => offline.has(t.id)).map((t) => t.id);
-    if (ids.length && confirm(`Apagar ${ids.length} download(s)? Para ouvir sem internet, vai precisar baixar de novo.`)) offline.remove(ids);
+    if (!ids.length) return;
+    const ok = await confirmDialog({ title: `Apagar ${ids.length} download(s)?`, text: 'As músicas continuam na biblioteca. Para ouvir sem internet, vai precisar baixar de novo.', confirmLabel: 'Apagar downloads' });
+    if (ok) offline.remove(ids);
   },
   progressText() {
     const { active, queued, error, failed } = offline.status;
@@ -175,7 +190,7 @@ const player = createPlayer({
   ),
   artUrl,
   fallbackArt: new URL('../proto/icon-180.png', import.meta.url).href,
-  onUpdate: (s) => { updatePlayerUI(s); saveState(s); },
+  onUpdate: (s) => { updatePlayerUI(s); saveState(s); ui.setNowPlaying(s.track?.id ?? null, s.playing); },
   onError: (err) => {
     if (isNetworkError(err)) return toast(OFFLINE_MSG);
     setStatus(err.name === 'AuthError' ? 'O acesso ao Google venceu. Toque em "Entrar com Google".' : `Não deu para tocar: ${err.message}`);
@@ -187,6 +202,7 @@ updatePlayerUI = createPlayerUI({ player, artUrl, $, canPlay });
 const ui = createLibraryUI({
   root: $('library'),
   title: $('title'),
+  countEl: $('count'),
   back: $('back'),
   search: $('search'),
   tabs: document.querySelectorAll('[data-tab]'),
@@ -222,7 +238,10 @@ async function sync() {
       db,
       onProgress: (p) => {
         if (p.phase === 'listing') setStatus('Conferindo a pasta Músicas no Drive…');
-        if (p.phase === 'tags' && p.total) setStatus(`Lendo músicas novas: ${p.done} de ${p.total}`);
+        if (p.phase === 'tags' && p.total) {
+          setStatus(`Lendo músicas novas: ${p.done} de ${p.total}`);
+          setSyncBar(p.done / p.total);
+        }
       },
     });
     setOnline(true);
@@ -237,6 +256,7 @@ async function sync() {
     setStatus(err.name === 'AuthError' ? 'O acesso ao Google venceu. Toque em "Entrar com Google".' : `Não deu para atualizar: ${err.message}`);
   } finally {
     syncing = false;
+    setSyncBar(null);
     refreshButtons();
   }
 }

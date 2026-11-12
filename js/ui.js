@@ -1,17 +1,45 @@
-// Telas da biblioteca: abas Músicas, Artistas, Álbuns, Playlists e Baixadas, busca, detalhes, downloads e playlists (T6, T10, T11).
-// Visual provisório: o design definitivo sai da T13.
+// Telas da biblioteca e do player (T6 a T13). Visual: direção "fita cassete" (ver PRODUCT.md e DESIGN.md).
+// Só interface: nenhuma regra de tocar, baixar ou guardar mora aqui.
 import { groupByAlbum, groupByArtist, searchTracks, sortTracks } from './library.js';
+import { askText, confirmDialog, openSheet } from './dialogs.js';
 
+const NS = 'http://www.w3.org/2000/svg';
 const el = (tag, props = {}, ...children) => {
   const n = Object.assign(document.createElement(tag), props);
   n.append(...children);
   return n;
 };
+/** Ícone desenhado do sprite do index.html (<symbol id="i-nome">). */
+function icon(name) {
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', 'ic');
+  svg.setAttribute('aria-hidden', 'true');
+  const use = document.createElementNS(NS, 'use');
+  use.setAttribute('href', `#i-${name}`);
+  svg.append(use);
+  return svg;
+}
+const setIcon = (btn, name) => btn.querySelector('use').setAttribute('href', `#i-${name}`);
+
+// Cores das etiquetas de fita das playlists: a mesma playlist sempre ganha a mesma cor.
+const CHIPS = ['#F4D03F', '#FF6B2C', '#5CC8B5', '#F28DB2', '#9B8CFF', '#8FD16B'];
+const chipColor = (s) => {
+  let h = 0;
+  for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return CHIPS[h % CHIPS.length];
+};
+const count = (n) => `${n} música${n === 1 ? '' : 's'}`;
+const TAB_TITLE = { songs: 'Músicas', artists: 'Artistas', albums: 'Álbuns', playlists: 'Playlists', downloads: 'Baixadas' };
+
+function emptyState(iconName, heading, text) {
+  return el('div', { className: 'empty' }, icon(iconName), el('h2', { textContent: heading }), text ? el('p', { textContent: text }) : '');
+}
 
 /**
  * @param {object} o
  * @param {HTMLElement} o.root     onde as listas são desenhadas
  * @param {HTMLElement} o.title    título da tela atual
+ * @param {HTMLElement} o.countEl  etiqueta amarela com a contagem da tela atual
  * @param {HTMLElement} o.back     botão voltar
  * @param {HTMLInputElement} o.search
  * @param {NodeListOf<HTMLButtonElement>} o.tabs  botões com data-tab
@@ -24,36 +52,42 @@ const el = (tag, props = {}, ...children) => {
  * @param {object} o.playlists  list(), get(id), tracksOf(pl), create(name), rename(id, name), remove(id), add(id, ids), removeAt(id, i), move(id, from, to)
  * @param {(text: string) => void} o.toast
  */
-export function createLibraryUI({ root, title, back, search, tabs, getArt, onPlay, onlyDownloaded, isDownloaded, isAvailable, downloads, playlists, toast }) {
+export function createLibraryUI({ root, title, countEl, back, search, tabs, getArt, onPlay, onlyDownloaded, isDownloaded, isAvailable, downloads, playlists, toast }) {
   let tracks = [];
   let tab = 'songs';
   let detail = null; // { kind: 'artist' | 'album' | 'playlist', group } (playlist: group = { id })
   let editing = false; // detalhe de playlist em modo de edição (▲ ▼ ✕)
+  let nowId = null; // faixa tocando agora (para marcar a linha)
+  let nowPlaying = false;
   const artUrls = new Map(); // albumKey -> object URL (fica enquanto o app está aberto)
   let dlButtons = new Map(); // id -> [{ t, b }] dos botões de download na tela, para atualizar o %
   let progressEl = null; // linha de progresso da aba Baixadas, quando aberta
+  const rowTpl = document.getElementById('row-tpl').content.firstElementChild;
+  const setCount = (n) => { countEl.hidden = n == null; if (n != null) countEl.textContent = String(n); };
 
+  // O botão de download de cada linha: ícone (baixar, na fila, baixada) ou a porcentagem enquanto baixa.
   function setDl(b, t) {
     const s = downloads.state(t.id);
-    const [text, label] = s === 'done' ? ['✓', `Baixada. Toque para apagar o download de ${t.title}`]
-      : s === 'active' ? [`${downloads.percent(t.id)}%`, `Baixando ${t.title}`]
-        : s === 'queued' ? ['…', `${t.title} na fila para baixar. Toque para tirar da fila`]
-          : ['⬇︎', `Baixar ${t.title}`];
-    b.textContent = text;
-    b.ariaLabel = label;
+    const pct = b.querySelector('.pct');
     b.classList.toggle('done', s === 'done');
+    b.classList.toggle('busy', s === 'active');
+    pct.textContent = s === 'active' ? `${downloads.percent(t.id)}%` : '';
+    if (s === 'done') { setIcon(b, 'check'); b.ariaLabel = `Baixada. Toque para apagar o download de ${t.title}`; }
+    else if (s === 'active') b.ariaLabel = `Baixando ${t.title}`;
+    else if (s === 'queued') { setIcon(b, 'dots'); b.ariaLabel = `${t.title} na fila para baixar. Toque para tirar da fila`; }
+    else { setIcon(b, 'download'); b.ariaLabel = `Baixar ${t.title}`; }
   }
 
-  // Baixar todas / baixando / apagar downloads de um álbum ou artista.
+  // Baixar todas / baixando / apagar downloads de um álbum, artista ou playlist.
   function bulkButton(list, what = 'todas') {
     const states = list.map((t) => downloads.state(t.id));
     const missing = states.filter((s) => !s).length;
+    const btn = (text, onclick, disabled = false) => el('button', { className: 'btn', type: 'button', textContent: text, disabled, onclick });
     if (missing) {
-      const text = missing === list.length ? `Baixar ${what} (${missing})` : `Baixar as ${missing} que faltam`;
-      return el('button', { className: 'bulk', textContent: text, onclick: () => downloads.add(list) });
+      return btn(missing === list.length ? `Baixar ${what} (${missing})` : `Baixar as ${missing} que faltam`, () => downloads.add(list));
     }
-    if (states.some((s) => s !== 'done')) return el('button', { className: 'bulk', textContent: 'Baixando…', disabled: true });
-    return el('button', { className: 'bulk', textContent: 'Apagar downloads', onclick: () => downloads.removeAll(list) });
+    if (states.some((s) => s !== 'done')) return btn('Baixando…', null, true);
+    return btn('Apagar downloads', () => downloads.removeAll(list));
   }
 
   async function artUrl(key) {
@@ -66,107 +100,120 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
 
   function trackList(list, { showAlbum = true, numbered = false } = {}) {
     const ul = el('ul', { className: 'tracks' });
+    const byId = new Map(list.map((t) => [t.id, t]));
     const frag = document.createDocumentFragment();
-    for (const t of list) {
-      const sub = showAlbum ? `${t.artist} · ${t.album}` : t.artist;
-      const li = el('li', { className: 'row', tabIndex: 0 },
-        el('span', { className: 'title', textContent: numbered && t.trackNo ? `${t.trackNo}. ${t.title}` : t.title }),
-        el('span', { className: 'sub', textContent: sub }));
-      if (t.removedFromDrive) li.append(el('span', { className: 'sub removed', textContent: 'removida do Drive' }));
+    list.forEach((t, i) => {
+      const li = rowTpl.cloneNode(true);
+      li.dataset.id = t.id;
+      li.classList.toggle('numbered', numbered);
+      li.querySelector('.lead').textContent = numbered ? String(t.trackNo ?? i + 1).padStart(2, '0') : '';
+      li.querySelector('.title').textContent = t.title;
+      li.querySelector('.sub').textContent = showAlbum ? `${t.artist} · ${t.album}` : t.artist;
+      if (t.removedFromDrive) li.querySelector('.meta').append(el('span', { className: 'tag', textContent: 'removida do Drive' }));
       if (!isAvailable(t)) { li.classList.add('off'); li.ariaDisabled = 'true'; } // sem internet e não baixada
-      li.onclick = () => onPlay(t, list);
-      const add = el('button', {
-        className: 'add', type: 'button', textContent: '+', ariaLabel: `Adicionar ${t.title} a uma playlist`,
-        onclick: (e) => { e.stopPropagation(); pickPlaylist([t.id]); },
-      });
-      const b = el('button', { className: 'dl', type: 'button' });
+      li.querySelector('.add').ariaLabel = `Adicionar ${t.title} a uma playlist`;
+      const b = li.querySelector('.dl');
       setDl(b, t);
-      b.onclick = (e) => { e.stopPropagation(); downloads.toggle(t); };
-      li.append(add, b);
       if (!dlButtons.has(t.id)) dlButtons.set(t.id, []);
       dlButtons.get(t.id).push({ t, b });
       frag.append(li);
-    }
+    });
     ul.append(frag);
+    // Um só ouvinte por lista (em vez de um por botão): rola leve mesmo com milhares de músicas.
+    ul.onclick = (e) => {
+      const li = e.target.closest('li.row');
+      if (!li) return;
+      const t = byId.get(li.dataset.id);
+      const act = e.target.closest('button')?.dataset.act;
+      if (act === 'add') pickPlaylist([t.id]);
+      else if (act === 'dl') downloads.toggle(t);
+      else onPlay(t, list);
+    };
+    ul.onkeydown = (e) => {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('li.row')) { e.preventDefault(); e.target.click(); }
+    };
     return ul;
   }
 
-  function groupList(groups, label, open) {
+  // Linha de artista, álbum ou playlist: etiqueta de fita, nome, resumo e seta.
+  function groupList(groups, label, open, { chip = 'plain' } = {}) {
     const ul = el('ul', { className: 'tracks' });
     const frag = document.createDocumentFragment();
     for (const g of groups) {
-      const li = el('li', { className: 'row', tabIndex: 0 },
-        el('span', { className: 'title', textContent: label(g).title }),
-        el('span', { className: 'sub', textContent: label(g).sub }));
+      const l = label(g);
+      const li = el('li', { className: `row group${chip ? '' : ' no-chip'}`, tabIndex: 0 });
+      if (chip) li.append(el('span', { className: `chip${chip === 'plain' ? ' plain' : ''}`, style: chip === 'plain' ? '' : `--c:${chipColor(l.title)}` }));
+      li.append(el('div', { className: 'meta' }, el('span', { className: 'title', textContent: l.title }), el('span', { className: 'sub', textContent: l.sub })), icon('chevron-right'));
       li.onclick = () => open(g);
+      li.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(g); } };
       frag.append(li);
     }
     ul.append(frag);
     return ul;
   }
 
-  const count = (n) => `${n} música${n === 1 ? '' : 's'}`;
-
-  // ---- playlists (T11) ----
-  const askName = (initial = '') => prompt('Nome da playlist:', initial); // provisório: o design final troca por uma tela própria
+  // ---- playlists ----
+  const askName = (initial = '') => askText({
+    title: initial ? 'Renomear playlist' : 'Nova playlist', label: 'Nome da playlist', initial, confirmLabel: initial ? 'Renomear' : 'Criar',
+  });
 
   // Folha de baixo: escolhe a playlist (ou cria uma) para receber as faixas.
   function pickPlaylist(ids) {
-    const close = () => overlay.remove();
     const done = async (id) => {
       const n = await playlists.add(id, ids);
-      close();
-      toast(n ? `${n} música(s) em "${playlists.get(id).name}".` : `Já estava em "${playlists.get(id).name}".`);
+      handle.close();
+      toast(n ? `${count(n)} em "${playlists.get(id).name}".` : `Já estava em "${playlists.get(id).name}".`);
     };
     const list = el('ul', { className: 'sheet-list' });
     for (const pl of playlists.list()) {
-      list.append(el('li', {}, el('button', { textContent: `${pl.name} · ${count(pl.trackIds.length)}`, onclick: () => done(pl.id) })));
+      list.append(el('li', {}, el('button', {
+        className: 'btn', type: 'button', onclick: () => done(pl.id),
+      }, el('span', { className: 'chip', style: `--c:${chipColor(pl.name)}` }), `${pl.name} · ${count(pl.trackIds.length)}`)));
     }
     const create = el('button', {
-      textContent: '+ Nova playlist',
+      className: 'btn', type: 'button',
       onclick: async () => {
-        const name = askName();
+        const name = await askName();
         if (!name) return;
         const pl = await playlists.create(name);
         if (pl) await done(pl.id); else toast('Nome inválido.');
       },
-    });
-    const overlay = el('div', { className: 'sheet', onclick: (e) => { if (e.target === overlay) close(); } },
-      el('div', { className: 'sheet-body', role: 'dialog', ariaLabel: 'Adicionar à playlist' },
-        el('h2', { textContent: `Adicionar ${count(ids.length)} a…` }), list, create,
-        el('button', { textContent: 'Cancelar', onclick: close })));
-    document.body.append(overlay);
+    }, icon('plus'), 'Nova playlist');
+    const sheet = el('dialog', { className: 'sheet', ariaLabel: 'Adicionar à playlist' },
+      el('h2', { textContent: `Adicionar ${count(ids.length)} a…` }), list, create,
+      el('button', { className: 'btn', type: 'button', textContent: 'Cancelar', onclick: () => handle.close() }));
+    const handle = openSheet(sheet);
   }
-  const addAllButton = (list) => el('button', { className: 'bulk', textContent: '+ Adicionar à playlist', onclick: () => pickPlaylist(list.map((t) => t.id)) });
+  const addAllButton = (list) => el('button', { className: 'btn', type: 'button', onclick: () => pickPlaylist(list.map((t) => t.id)) }, icon('plus'), 'Adicionar à playlist');
 
   function renderPlaylistList() {
     const all = playlists.list();
-    root.append(el('button', {
-      className: 'bulk', textContent: '+ Nova playlist',
+    setCount(all.length);
+    root.append(el('div', { className: 'actions' }, el('button', {
+      className: 'btn', type: 'button',
       onclick: async () => {
-        const name = askName();
+        const name = await askName();
         if (!name) return;
         const pl = await playlists.create(name);
         if (pl) openDetail('playlist', { id: pl.id }); else toast('Nome inválido.');
       },
-    }));
-    if (!all.length) return root.append(el('p', { className: 'status', textContent: 'Nenhuma playlist ainda.' }));
-    root.append(groupList(all, (pl) => ({ title: pl.name, sub: count(playlists.tracksOf(pl).length) }), (pl) => openDetail('playlist', { id: pl.id })));
+    }, icon('plus'), 'Nova playlist')));
+    if (!all.length) return root.append(emptyState('cassette', 'Nenhuma playlist ainda', 'Toque em + numa música, ou em "Adicionar à playlist" num álbum.'));
+    root.append(groupList(all, (pl) => ({ title: pl.name, sub: count(playlists.tracksOf(pl).length) }), (pl) => openDetail('playlist', { id: pl.id }), { chip: 'color' }));
   }
 
   // Modo de edição: ▲ ▼ mexem na ordem (em relação à faixa vizinha da lista) e ✕ tira da playlist.
   function editRows(pl, list) {
     const ul = el('ul', { className: 'tracks' });
-    const ctl = (text, label, onclick, disabled = false) => el('button', { className: 'ctl', type: 'button', textContent: text, ariaLabel: label, disabled, onclick });
+    const ctl = (name, label, onclick, disabled = false) => el('button', { className: 'ctl', type: 'button', ariaLabel: label, disabled, onclick }, icon(name));
     list.forEach((t, i) => {
       const idx = pl.trackIds.indexOf(t.id);
       ul.append(el('li', { className: 'row edit' },
-        el('span', { className: 'title', textContent: t.title }),
-        el('span', { className: 'sub', textContent: t.artist }),
+        el('div', { className: 'meta' }, el('span', { className: 'title', textContent: t.title }), el('span', { className: 'sub', textContent: t.artist })),
         el('span', { className: 'ctls' },
-          ctl('▲', `Subir ${t.title}`, () => playlists.move(pl.id, idx, pl.trackIds.indexOf(list[i - 1].id)), i === 0),
-          ctl('▼', `Descer ${t.title}`, () => playlists.move(pl.id, idx, pl.trackIds.indexOf(list[i + 1].id)), i === list.length - 1),
-          ctl('✕', `Tirar ${t.title} da playlist`, () => playlists.removeAt(pl.id, idx)))));
+          ctl('up', `Subir ${t.title}`, () => playlists.move(pl.id, idx, pl.trackIds.indexOf(list[i - 1].id)), i === 0),
+          ctl('chevron-down', `Descer ${t.title}`, () => playlists.move(pl.id, idx, pl.trackIds.indexOf(list[i + 1].id)), i === list.length - 1),
+          ctl('x', `Tirar ${t.title} da playlist`, () => playlists.removeAt(pl.id, idx)))));
     });
     return ul;
   }
@@ -176,23 +223,25 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
     if (!pl) { detail = null; return render(); } // foi apagada
     title.textContent = pl.name;
     const list = playlists.tracksOf(pl);
+    setCount(list.length);
     const hidden = pl.trackIds.length - list.length;
-    root.append(
-      el('p', { className: 'sub', textContent: `${count(list.length)}${hidden ? ` · ${hidden} fora da biblioteca` : ''}` }),
-      el('div', { className: 'actions' },
-        el('button', { textContent: '▶︎ Tocar', disabled: !list.some(isAvailable), onclick: () => onPlay(list.find(isAvailable), list) }),
-        el('button', { textContent: editing ? 'Pronto' : 'Editar', onclick: () => { editing = !editing; render(); } })),
-    );
-    if (list.length) root.append(bulkButton(list, 'playlist'));
-    else root.append(el('p', { className: 'status', textContent: 'Playlist vazia. Toque em + numa música, ou em "Adicionar à playlist" num álbum.' }));
-    root.append(editing ? editRows(pl, list) : trackList(list));
+    if (hidden) root.append(el('p', { className: 'note', textContent: `${hidden} música(s) desta playlist não estão mais na biblioteca.` }));
+    root.append(el('div', { className: 'actions' },
+      el('button', { className: 'btn primary', type: 'button', disabled: !list.some(isAvailable), onclick: () => onPlay(list.find(isAvailable), list) }, icon('play'), 'Tocar'),
+      el('button', { className: 'btn', type: 'button', textContent: editing ? 'Pronto' : 'Editar', onclick: () => { editing = !editing; render(); } }),
+      ...(list.length ? [bulkButton(list, 'playlist')] : [])));
+    if (!list.length) root.append(emptyState('cassette', 'Playlist vazia', 'Toque em + numa música, ou em "Adicionar à playlist" num álbum.'));
+    else root.append(editing ? editRows(pl, list) : trackList(list, { numbered: true }));
     if (editing) {
       root.append(el('div', { className: 'actions' },
-        el('button', { textContent: 'Renomear', onclick: () => { const name = askName(pl.name); if (name) playlists.rename(pl.id, name); } }),
+        el('button', { className: 'btn', type: 'button', textContent: 'Renomear', onclick: async () => { const name = await askName(pl.name); if (name) playlists.rename(pl.id, name); } }),
         el('button', {
-          className: 'danger', textContent: 'Apagar playlist',
-          onclick: () => {
-            if (!confirm(`Apagar a playlist "${pl.name}"? As músicas e os downloads não são apagados.`)) return;
+          className: 'btn danger', type: 'button', textContent: 'Apagar playlist',
+          onclick: async () => {
+            const ok = await confirmDialog({
+              title: `Apagar "${pl.name}"?`, text: 'As músicas e os downloads não são apagados, só a playlist.', confirmLabel: 'Apagar playlist',
+            });
+            if (!ok) return;
             editing = false;
             detail = null;
             playlists.remove(pl.id);
@@ -210,16 +259,19 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
   }
 
   async function renderAlbum(g) {
-    const cover = el('div', { className: 'cover' });
-    const head = el('div', { className: 'album-head' }, cover,
-      el('div', {}, el('p', { className: 'title', textContent: g.artist }), el('p', { className: 'sub', textContent: count(g.tracks.length) }),
-        bulkButton(g.tracks), addAllButton(g.tracks)));
-    root.append(head, trackList(g.tracks, { showAlbum: false, numbered: true }));
+    setCount(g.tracks.length);
+    const cover = el('div', { className: 'cover' }, icon('cassette'));
+    root.append(
+      el('div', { className: 'album-head' }, cover,
+        el('div', { className: 'meta' }, el('span', { className: 'title', textContent: g.artist }), el('span', { className: 'sub', textContent: count(g.tracks.length) }),
+          el('div', { className: 'actions' }, bulkButton(g.tracks), addAllButton(g.tracks)))),
+      trackList(g.tracks, { showAlbum: false, numbered: true }));
     const url = g.hasArt ? await artUrl(g.key) : null;
-    if (url) cover.append(el('img', { src: url, alt: `Capa de ${g.album}` }));
+    if (url) cover.replaceChildren(el('img', { src: url, alt: `Capa de ${g.album}` }));
   }
 
-  function render() {
+  // Desenha a tela atual. Sempre termina marcando a linha que está tocando.
+  function build() {
     root.textContent = '';
     dlButtons = new Map();
     progressEl = null;
@@ -227,6 +279,7 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
     for (const b of tabs) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
     back.hidden = !detail;
     search.hidden = Boolean(detail) || tab === 'playlists';
+    onlyDownloaded.parentElement.hidden = search.hidden; // o filtro só vale para as listas de músicas
 
     if (detail?.kind === 'playlist') return renderPlaylist(detail.group.id);
     if (detail?.kind === 'album') {
@@ -235,43 +288,61 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
     }
     if (detail?.kind === 'artist') {
       title.textContent = detail.group.artist;
-      return root.append(bulkButton(detail.group.tracks), addAllButton(detail.group.tracks), groupList(detail.group.albums,
-        (a) => ({ title: a.album, sub: count(a.tracks.length) }), (a) => openDetail('album', a)));
+      setCount(detail.group.albums.length);
+      return root.append(el('div', { className: 'actions' }, bulkButton(detail.group.tracks), addAllButton(detail.group.tracks)),
+        groupList(detail.group.albums, (a) => ({ title: a.album, sub: count(a.tracks.length) }), (a) => openDetail('album', a)));
     }
-    if (tab === 'playlists') {
-      title.textContent = 'Playlists';
-      return renderPlaylistList();
-    }
+    title.textContent = TAB_TITLE[tab];
+    if (tab === 'playlists') return renderPlaylistList();
 
     const pool = onlyDownloaded.checked ? tracks.filter(isDownloaded) : tracks;
     const found = searchTracks(pool, q);
-    if (!tracks.length) return; // a mensagem de "entre/atualize" fica no status
-    if (!pool.length) return root.append(el('p', { className: 'status', textContent: 'Nenhuma música baixada ainda.' }));
-    if (!found.length) return root.append(el('p', { className: 'status', textContent: `Nada encontrado para "${q}".` }));
+    if (!tracks.length) {
+      setCount(null);
+      return root.append(emptyState('cassette', 'Nenhuma música ainda', 'Entre com o Google e toque em atualizar para carregar a pasta Músicas do seu Drive.'));
+    }
+    if (!pool.length) { setCount(0); return root.append(emptyState('download', 'Nenhuma música baixada', 'Toque no ícone de baixar numa música, ou em "Baixar todas" num álbum.')); }
+    if (!found.length) { setCount(0); return root.append(emptyState('cassette', 'Nada encontrado', `Nenhuma música com "${q}".`)); }
 
     if (tab === 'songs') {
-      title.textContent = 'Músicas';
+      setCount(found.length);
       root.append(trackList(sortTracks(found)));
     } else if (tab === 'artists') {
-      title.textContent = 'Artistas';
-      root.append(groupList(groupByArtist(found),
-        (g) => ({ title: g.artist, sub: `${g.albums.length} álbum(ns) · ${count(g.tracks.length)}` }), (g) => openDetail('artist', g)));
+      const groups = groupByArtist(found);
+      setCount(groups.length);
+      root.append(groupList(groups, (g) => ({ title: g.artist, sub: `${g.albums.length} álbum(ns) · ${count(g.tracks.length)}` }), (g) => openDetail('artist', g), { chip: null }));
     } else if (tab === 'albums') {
-      title.textContent = 'Álbuns';
-      root.append(groupList(groupByAlbum(found),
-        (g) => ({ title: g.album, sub: `${g.artist} · ${count(g.tracks.length)}` }), (g) => openDetail('album', g)));
+      const groups = groupByAlbum(found);
+      setCount(groups.length);
+      root.append(groupList(groups, (g) => ({ title: g.album, sub: `${g.artist} · ${count(g.tracks.length)}` }), (g) => openDetail('album', g)));
     } else {
-      title.textContent = 'Baixadas';
+      const mine = sortTracks(found.filter(isDownloaded));
+      setCount(mine.length);
       const space = el('p', { className: 'status', textContent: 'Calculando o espaço…' });
       downloads.spaceText().then((text) => { space.textContent = text; }).catch(() => { space.textContent = ''; });
       progressEl = el('p', { className: 'status', textContent: downloads.progressText() });
       root.append(el('div', { className: 'panel' }, space, progressEl));
-      const mine = sortTracks(found.filter(isDownloaded));
-      if (!mine.length) {
-        return root.append(el('p', { className: 'status', textContent: 'Nenhuma música baixada ainda. Toque em ⬇︎ numa música ou em "Baixar todas" num álbum.' }));
-      }
+      if (!mine.length) return root.append(emptyState('download', 'Nenhuma música baixada', 'Toque no ícone de baixar numa música, ou em "Baixar todas" num álbum.'));
       root.append(trackList(mine));
     }
+  }
+
+  // Marca a linha que está tocando: fundo mais claro, título laranja e três barrinhas que só se mexem enquanto toca.
+  function markNow() {
+    root.classList.toggle('is-playing', nowPlaying);
+    root.querySelector('[aria-current]')?.removeAttribute('aria-current');
+    root.querySelector('.eq')?.remove();
+    if (!nowId) return;
+    const li = root.querySelector(`li.row[data-id="${CSS.escape(nowId)}"]`);
+    if (!li) return;
+    li.setAttribute('aria-current', 'true');
+    li.append(el('span', { className: 'eq', ariaHidden: 'true' }, el('i'), el('i'), el('i')));
+  }
+
+  function render() {
+    const r = build();
+    markNow();
+    return r;
   }
 
   for (const b of tabs) b.onclick = () => { tab = b.dataset.tab; detail = null; editing = false; render(); };
@@ -286,6 +357,14 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
       for (const { t, b } of dlButtons.get(id) ?? []) setDl(b, t);
       if (progressEl) progressEl.textContent = downloads.progressText();
     },
+    setNowPlaying(id, playing) {
+      if (id === nowId && playing === nowPlaying) return;
+      const sameTrack = id === nowId;
+      nowId = id;
+      nowPlaying = playing;
+      if (sameTrack) root.classList.toggle('is-playing', playing);
+      else markNow();
+    },
     setTracks(list) {
       tracks = list;
       // Depois de sincronizar, um detalhe aberto pode ter mudado: volta para a aba.
@@ -296,7 +375,7 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
   };
 }
 
-// ---- mini player e tela cheia (T7) ----
+// ---- mini player e tela cheia ----
 const fmt = (s) => (Number.isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : '0:00');
 const REPEAT_LABEL = { off: 'Repetir: desligado', all: 'Repetir: tudo', one: 'Repetir: uma' };
 
@@ -312,21 +391,21 @@ export function createPlayerUI({ player, artUrl, $, canPlay }) {
   let shownOrder = null; // fila desenhada na lista (order e items de q)
   let shownItems = null;
   let dragging = false;
+  const seek = $('seek');
 
-  $('miniOpen').onclick = () => { $('full').hidden = false; document.body.classList.add('full-open'); scrollQueue(); };
-  $('fullClose').onclick = () => { $('full').hidden = true; document.body.classList.remove('full-open'); };
+  const openFull = () => { $('full').hidden = false; document.body.classList.add('full-open'); $('full').scrollTop = 0; $('fullClose').focus(); };
+  const closeFull = () => { $('full').hidden = true; document.body.classList.remove('full-open'); $('miniOpen').focus(); };
+  $('miniOpen').onclick = openFull;
+  $('fullClose').onclick = closeFull;
+  $('full').addEventListener('keydown', (e) => { if (e.key === 'Escape') closeFull(); });
   $('miniToggle').onclick = $('toggle').onclick = () => player.toggle();
   $('miniNext').onclick = $('next').onclick = () => player.next();
   $('prev').onclick = () => player.prev();
   $('shuffle').onclick = () => player.toggleShuffle();
   $('repeat').onclick = () => player.cycleRepeat();
-  const seek = $('seek');
-  seek.oninput = () => { dragging = true; $('tNow').textContent = fmt(Number(seek.value)); };
+  const fill = () => seek.style.setProperty('--seekp', `${seek.max > 0 ? (Number(seek.value) / Number(seek.max)) * 100 : 0}%`);
+  seek.oninput = () => { dragging = true; $('tNow').textContent = fmt(Number(seek.value)); fill(); };
   seek.onchange = () => { player.seek(Number(seek.value)); dragging = false; };
-
-  function scrollQueue() {
-    $('queue').querySelector('[aria-current]')?.scrollIntoView({ block: 'center' });
-  }
 
   function renderQueue(q) {
     const ol = $('queue');
@@ -335,9 +414,9 @@ export function createPlayerUI({ player, artUrl, $, canPlay }) {
     q.order.forEach((idx, pos) => {
       const t = q.items[idx];
       const li = el('li', { className: 'row', tabIndex: 0 },
-        el('span', { className: 'title', textContent: t.title }),
-        el('span', { className: 'sub', textContent: t.artist }));
+        el('div', { className: 'meta' }, el('span', { className: 'title', textContent: t.title }), el('span', { className: 'sub', textContent: t.artist })));
       li.onclick = () => { if (canPlay(t)) player.playAt(pos); };
+      li.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); li.click(); } };
       frag.append(li);
     });
     ol.append(frag);
@@ -347,18 +426,26 @@ export function createPlayerUI({ player, artUrl, $, canPlay }) {
     const t = s.track;
     $('mini').hidden = !t;
     if (!t) return;
-    const pauseLabel = s.playing ? 'Pausar' : 'Tocar';
-    for (const b of [$('miniToggle'), $('toggle')]) { b.textContent = s.playing ? '⏸︎' : '▶︎'; b.ariaLabel = pauseLabel; }
+    // A fita: quanto da música já passou (0 a 1) decide o tamanho dos dois carretéis.
+    const p = s.duration ? Math.min(1, Math.max(0, s.time / s.duration)) : 0;
+    for (const node of [$('mini'), $('cassette')]) {
+      node.style.setProperty('--p', p.toFixed(3));
+      node.classList.toggle('playing', s.playing);
+      node.classList.toggle('loading', s.loading);
+    }
+    for (const b of [$('miniToggle'), $('toggle')]) { setIcon(b, s.playing ? 'pause' : 'play'); b.ariaLabel = s.playing ? 'Pausar' : 'Tocar'; }
     const sub = s.loading ? 'Carregando…' : `${t.artist} · ${t.album}`;
     $('miniSub').textContent = sub;
     $('fullSub').textContent = sub;
     $('shuffle').ariaPressed = String(s.queue.shuffle);
     $('repeat').ariaPressed = String(s.queue.repeat !== 'off');
     $('repeat').ariaLabel = REPEAT_LABEL[s.queue.repeat];
-    $('repeat').textContent = s.queue.repeat === 'one' ? '🔂︎' : '🔁︎';
+    setIcon($('repeat'), s.queue.repeat === 'one' ? 'repeat-one' : 'repeat');
     if (!dragging) {
       seek.max = String(Math.floor(s.duration) || 0);
       seek.value = String(Math.floor(s.time));
+      seek.setAttribute('aria-valuetext', `${fmt(s.time)} de ${fmt(s.duration)}`);
+      fill();
       $('tNow').textContent = fmt(s.time);
     }
     $('tEnd').textContent = fmt(s.duration);
@@ -376,14 +463,16 @@ export function createPlayerUI({ player, artUrl, $, canPlay }) {
       shownId = t.id;
       $('miniTitle').textContent = t.title;
       $('fullTitle').textContent = t.title;
-      const cover = $('fullCover');
-      cover.textContent = '';
+      $('fullAlbum').textContent = t.album;
+      // Sem capa nas tags, a fita desenhada ocupa o lugar; com capa, ela aparece no lugar da fita.
+      const art = $('fullCover');
+      art.querySelector('img')?.remove();
+      art.classList.remove('has-cover');
       if (t.hasArt) {
         artUrl(t).then((url) => {
-          if (url && shownId === t.id) cover.append(el('img', { src: url, alt: `Capa de ${t.album}` }));
+          if (url && shownId === t.id) { art.append(el('img', { src: url, alt: `Capa de ${t.album}` })); art.classList.add('has-cover'); }
         });
       }
-      if (!$('full').hidden) scrollQueue();
     }
   };
 }

@@ -5,7 +5,7 @@
 // falha se ele estiver velho). O navegador vê o sw.js diferente, baixa TODOS os arquivos para um cache
 // novo e só então troca (tudo ou nada: nunca mistura arquivos de versões diferentes).
 // A troca vale a partir da abertura seguinte do app.
-const VERSION = 'b9272b4b9e19';
+const VERSION = '65c78e3a9434';
 const CACHE = `app-${VERSION}`;
 const ASSETS = [
   './',
@@ -14,6 +14,7 @@ const ASSETS = [
   'js/auth.js',
   'js/config.js',
   'js/db.js',
+  'js/dialogs.js',
   'js/drive.js',
   'js/library.js',
   'js/offline.js',
