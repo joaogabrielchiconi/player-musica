@@ -9,16 +9,28 @@
 </head>
 <body>
   <header class="top">
-    <h1>Músicas</h1>
+    <button id="back" class="back" hidden>‹ Voltar</button>
+    <h1 id="title">Músicas</h1>
     <div class="actions">
       <button id="signin" hidden>Entrar com Google</button>
       <button id="sync" hidden>Atualizar biblioteca</button>
     </div>
     <p class="status" id="status" aria-live="polite"></p>
+    <input id="search" class="search" type="search" placeholder="Buscar música, artista ou álbum" aria-label="Buscar" autocomplete="off">
   </header>
-  <main>
-    <ul class="tracks" id="tracks"></ul>
-  </main>
+  <main id="library"></main>
+  <footer class="bottom">
+    <div class="now" id="now" hidden>
+      <span id="nowTitle" class="now-title"></span>
+      <button id="nowToggle" aria-label="Pausar">⏸</button>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="songs" aria-selected="true">Músicas</button>
+      <button role="tab" data-tab="artists" aria-selected="false">Artistas</button>
+      <button role="tab" data-tab="albums" aria-selected="false">Álbuns</button>
+    </nav>
+  </footer>
+  <audio id="audio" playsinline preload="auto"></audio>
   <!-- Esta página também é o retorno do login do Google (REDIRECT_URI): app.js trata isso primeiro. -->
   <script type="module" src="js/app.js"></script>
 </body>

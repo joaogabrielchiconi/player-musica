@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { diffLibrary, syncLibrary, albumKey } from '../js/library.js';
+import { diffLibrary, syncLibrary, albumKey, groupByAlbum, groupByArtist, searchTracks, sortTracks } from '../js/library.js';
 import { AuthError } from '../js/auth.js';
 
 const file = (id, extra = {}) => ({ id, name: `Banda - Faixa ${id}.mp3`, folder: 'Álbum', size: 100, md5Checksum: `md5-${id}`, ...extra });
@@ -113,4 +113,39 @@ test('login vence no meio: o que foi gravado fica e a próxima rodada continua',
 test('pasta Músicas não existe: erro claro', async () => {
   const drive = { ...fakeDrive([]), findFolder: async () => null };
   await assert.rejects(syncLibrary({ drive, db: memDb() }), /não foi encontrada/);
+});
+
+// ---- agrupar e buscar (T6) ----
+const t = (id, title, artist, album, trackNo = null) => ({ id, title, artist, album, trackNo, hasArt: id === 'c' });
+const lib = [
+  t('a', 'Vento', 'José Silva', 'Mar', 2),
+  t('b', 'Areia', 'josé silva', 'Mar', 1),
+  t('c', 'Sem número', 'José Silva', 'Mar'),
+  t('d', 'Céu', 'Ana', 'Ábaco', 10),
+  t('e', 'Chão', 'Ana', 'Ábaco', 9),
+];
+
+test('álbum: faixas pela ordem do número, sem número no fim; capa se alguma tiver', () => {
+  const albums = groupByAlbum(lib);
+  assert.deepEqual(albums.map((g) => g.album), ['Ábaco', 'Mar']);
+  assert.deepEqual(albums[0].tracks.map((x) => x.id), ['e', 'd']); // 9 antes de 10
+  assert.deepEqual(albums[1].tracks.map((x) => x.id), ['b', 'a', 'c']);
+  assert.equal(albums[1].hasArt, true);
+  assert.equal(albums[1].key, albumKey('José Silva', 'Mar'));
+});
+
+test('artista: junta grafias com maiúscula diferente e lista os álbuns', () => {
+  const artists = groupByArtist(lib);
+  assert.deepEqual(artists.map((g) => g.artist), ['Ana', 'José Silva']);
+  assert.equal(artists[1].tracks.length, 3);
+  assert.deepEqual(artists[1].albums.map((g) => g.album), ['Mar']);
+});
+
+test('busca ignora acento e maiúscula, em título, artista e álbum', () => {
+  const ids = (q) => searchTracks(lib, q).map((x) => x.id).sort();
+  assert.deepEqual(ids('jose'), ['a', 'b', 'c']);
+  assert.deepEqual(ids('CEU'), ['d']);
+  assert.deepEqual(ids('abaco chao'), ['e']); // todas as palavras precisam aparecer
+  assert.equal(searchTracks(lib, '  ').length, 5);
+  assert.deepEqual(sortTracks(lib).map((x) => x.id), ['d', 'e', 'b', 'c', 'a']); // Céu antes de Chão
 });

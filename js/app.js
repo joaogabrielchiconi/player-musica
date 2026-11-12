@@ -1,8 +1,9 @@
-// Inicialização do app. T5: login, sincronização da biblioteca e lista simples (as abas vêm na T6).
+// Inicialização do app: login, sincronização da biblioteca e abas (T5, T6).
 import { handleAuthReturn, signIn, getToken, clearToken } from './auth.js';
 import { createDrive } from './drive.js';
 import * as db from './db.js';
 import { syncLibrary } from './library.js';
+import { createLibraryUI } from './ui.js';
 
 const $ = (id) => document.getElementById(id);
 const drive = createDrive({ getToken, onUnauthorized: () => { clearToken(); return null; } });
@@ -17,19 +18,44 @@ function refreshButtons() {
   $('sync').disabled = syncing;
 }
 
+// shortcut: toca só a faixa tocada, sem fila nem próxima com a tela bloqueada; a T7 troca por js/player.js (receita do protótipo v4).
+const audio = $('audio');
+let playingId = null;
+async function play(t) {
+  if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback';
+  playingId = t.id;
+  $('now').hidden = false;
+  $('nowTitle').textContent = `Carregando: ${t.title}`;
+  try {
+    const blob = await drive.download(t.id);
+    if (playingId !== t.id) return; // tocou em outra enquanto baixava
+    if (audio.src) URL.revokeObjectURL(audio.src);
+    audio.src = URL.createObjectURL(blob);
+    await audio.play();
+    $('nowTitle').textContent = `${t.title} · ${t.artist}`;
+    if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist, album: t.album });
+  } catch (err) {
+    $('nowTitle').textContent = err.name === 'AuthError' ? 'O acesso ao Google venceu. Toque em "Entrar com Google".' : `Não deu para tocar: ${err.message}`;
+    refreshButtons();
+  }
+}
+$('nowToggle').onclick = () => (audio.paused ? audio.play() : audio.pause());
+audio.onplay = () => { $('nowToggle').textContent = '⏸'; $('nowToggle').ariaLabel = 'Pausar'; };
+audio.onpause = () => { $('nowToggle').textContent = '▶︎'; $('nowToggle').ariaLabel = 'Tocar'; };
+
+const ui = createLibraryUI({
+  root: $('library'),
+  title: $('title'),
+  back: $('back'),
+  search: $('search'),
+  tabs: document.querySelectorAll('[data-tab]'),
+  getArt: db.get,
+  onPlay: play,
+});
+
 async function render() {
   const tracks = await db.getAll('tracks');
-  tracks.sort((a, b) => a.artist.localeCompare(b.artist, 'pt-BR') || a.title.localeCompare(b.title, 'pt-BR'));
-  const list = $('tracks');
-  list.textContent = '';
-  for (const t of tracks) {
-    const li = document.createElement('li');
-    const title = Object.assign(document.createElement('span'), { className: 'title', textContent: t.title });
-    const sub = Object.assign(document.createElement('span'), { className: 'sub', textContent: `${t.artist} · ${t.album}` });
-    li.append(title, sub);
-    if (t.removedFromDrive) li.append(Object.assign(document.createElement('span'), { className: 'sub removed', textContent: 'removida do Drive' }));
-    list.append(li);
-  }
+  ui.setTracks(tracks);
   return tracks.length;
 }
 

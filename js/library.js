@@ -5,6 +5,51 @@ const FOLDER_NAME = 'Músicas';
 
 export const albumKey = (artist, album) => `${artist}\u0000${album}`.toLowerCase();
 
+// ---- agrupar, ordenar e buscar (puras: a interface só desenha o que sai daqui) ----
+const cmp = (a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base', numeric: true });
+
+// Sem acento e sem maiúscula: "José" e "jose" ficam iguais.
+export const normalize = (s) => String(s ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
+export const sortTracks = (tracks) => [...tracks].sort((a, b) => cmp(a.artist, b.artist) || cmp(a.title, b.title));
+
+// Faixa do álbum em ordem: número da faixa primeiro; sem número, vai para o fim, por título.
+const byTrackNo = (a, b) => (a.trackNo ?? Infinity) - (b.trackNo ?? Infinity) || cmp(a.title, b.title);
+
+export function groupByAlbum(tracks) {
+  const map = new Map();
+  for (const t of tracks) {
+    const key = albumKey(t.artist, t.album);
+    if (!map.has(key)) map.set(key, { key, album: t.album, artist: t.artist, hasArt: false, tracks: [] });
+    const g = map.get(key);
+    g.tracks.push(t);
+    g.hasArt ||= Boolean(t.hasArt);
+  }
+  for (const g of map.values()) g.tracks.sort(byTrackNo);
+  return [...map.values()].sort((a, b) => cmp(a.album, b.album) || cmp(a.artist, b.artist));
+}
+
+export function groupByArtist(tracks) {
+  const map = new Map();
+  for (const t of tracks) {
+    const key = t.artist.toLowerCase();
+    if (!map.has(key)) map.set(key, { key, artist: t.artist, tracks: [] });
+    map.get(key).tracks.push(t);
+  }
+  const out = [...map.values()].sort((a, b) => cmp(a.artist, b.artist));
+  for (const g of out) g.albums = groupByAlbum(g.tracks);
+  return out;
+}
+
+export function searchTracks(tracks, query) {
+  const words = normalize(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return tracks;
+  return tracks.filter((t) => {
+    const text = normalize(`${t.title} ${t.artist} ${t.album}`);
+    return words.every((w) => text.includes(w));
+  });
+}
+
 // Mesmo arquivo sem mudança: mesmo nome, mesma pasta e mesmo conteúdo (md5, ou data se não houver md5).
 const unchangedFile = (t, f) =>
   !t.removedFromDrive && t.name === f.name && t.folder === f.folder &&
