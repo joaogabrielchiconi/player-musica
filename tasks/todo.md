@@ -124,6 +124,13 @@ Também mede o tempo entre o toque e o início do som.
 
 **Depende de:** T1 · **Arquivos:** `js/tags.js`, `tests/tags.test.js` (tags montadas no próprio teste) · **Tamanho:** M
 
+**Resultado no iPhone (12/11/2026):**
+- As 3 faixas reais têm ID3v2.4 só com `TSSE` (`Lavf63.1.102`, gravado pelo ffmpeg do conversor): sem título, artista, álbum ou capa.
+- O leitor está certo; os dados vêm do nome do arquivo.
+- Para ter artista, álbum e capa: preencher as tags (ex.: Mp3tag), ou usar "Artista - Título" no nome do arquivo e uma subpasta por álbum.
+
+**Resultado no iPhone (12/11/2026):** as 3 faixas reais têm ID3v2.4 só com `TSSE` (Lavf63.1.102, gerado pelo ffmpeg do conversor): sem título, artista, álbum ou capa. O leitor está certo; os dados vêm do nome do arquivo. Para ter artista/álbum/capa: preencher as tags (ex.: Mp3tag) ou usar "Artista - Título" no nome e uma subpasta por álbum.
+
 ### Checkpoint: Fundação
 - [x] `node --test` passa.
 - [x] Quando o token vence, o app pede "Entrar" sem quebrar nem perder dados.
