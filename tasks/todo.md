@@ -216,18 +216,20 @@ Mini player fixo embaixo, que abre o player em tela cheia com a fila.
 **Descrição:** Salvar no `state` a fila, o índice, a posição (a cada ~5 s e ao pausar), o aleatório e o repetir. Restaurar ao abrir, com a faixa pausada no ponto salvo.
 
 **Critérios de aceite:**
-- [ ] Fechar o app pelo seletor de apps e reabrir mostra a mesma faixa, no ponto salvo (±5 s), com a mesma fila.
-- [ ] Um `state` corrompido ou com faixa que não existe mais não quebra o app: ele abre com o player vazio.
+- [x] Fechar o app pelo seletor de apps e reabrir mostra a mesma faixa, no ponto salvo (±5 s), com a mesma fila.
+- [x] Um `state` corrompido ou com faixa que não existe mais não quebra o app: ele abre com o player vazio.
 
 **Verificação:**
-- [ ] `node --test tests/queue.test.js` (serialização do estado)
-- [ ] Manual no iPhone.
+- [x] `node --test tests/queue.test.js` (serialização do estado)
+- [x] Manual no iPhone.
+
+**Resultado (12/11/2026):** aprovado no iPhone ("Deu certo"). Ao reabrir, a faixa volta pausada no ponto salvo e só baixa ao tocar ▶. Estado corrompido abre com o player vazio (testado no navegador do PC).
 
 **Depende de:** T7 · **Arquivos:** `js/player.js`, `js/queue.js`, `tests/queue.test.js` · **Tamanho:** S
 
 ### Checkpoint: Player
-- [ ] Os critérios 2, 3, 4 e 8 da spec passam no iPhone.
-- [ ] Revisão com você antes do offline.
+- [x] Os critérios 2, 3, 4 e 8 da spec passam no iPhone.
+- [x] Revisão com você antes do offline.
 
 ---
 
