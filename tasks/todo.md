@@ -197,13 +197,15 @@ Também mede o tempo entre o toque e o início do som.
 Mini player fixo embaixo, que abre o player em tela cheia com a fila.
 
 **Critérios de aceite:**
-- [ ] A lógica da fila (aleatório sem repetir até acabar, repetir, anterior depois de 3 s volta ao início da faixa) passa nos testes.
-- [ ] O critério 3 da spec passa com um álbum tocado pela tela de Álbuns.
-- [ ] A capa aparece na tela de bloqueio.
+- [x] A lógica da fila (aleatório sem repetir até acabar, repetir, anterior depois de 3 s volta ao início da faixa) passa nos testes.
+- [x] O critério 3 da spec passa com um álbum tocado pela tela de Álbuns.
+- [ ] A capa aparece na tela de bloqueio. (Sem como testar ainda: as músicas atuais não têm capa nas tags; aparece o ícone do app. Reconferir quando houver música com capa.)
 
 **Verificação:**
-- [ ] `node --test tests/queue.test.js`
-- [ ] Manual: tela bloqueada, com AirPods/fones se houver.
+- [x] `node --test tests/queue.test.js`
+- [x] Manual: tela bloqueada, com AirPods/fones se houver.
+
+**Resultado (12/11/2026):** aprovado no iPhone ("Deu certo"): álbum tocou até o fim com a tela bloqueada e os controles da tela de bloqueio funcionaram. Ícone ▶/⏸ segue a limitação aceita.
 
 **Depende de:** T6 · **Arquivos:** `js/player.js`, `js/queue.js`, `js/ui.js`, `tests/queue.test.js` · **Tamanho:** M
 
