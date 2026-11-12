@@ -134,7 +134,7 @@ $('list').onclick = async () => {
 };
 
 // ---------- experimentos (v2): som mudo na troca de faixa com a tela bloqueada ----------
-const VERSION = 'v7';
+const VERSION = 'v4';
 // v2 confirmou: as duas opções juntas resolvem o som mudo com a tela bloqueada.
 const OPTS = { optSession: ['opt_session', true], optTwo: ['opt_two', true] };
 const opts = {};
@@ -219,28 +219,6 @@ function getBlob(i) {
 
 // O iOS deduz o ícone ▶/⏸ da tela de bloqueio pelo último elemento que pausou; com dois elementos, a pausa
 // do anterior fazia o ícone ficar em ▶ com a música tocando. Por isso o estado é informado explicitamente.
-// Esvazia o elemento anterior: sem fonte, o iOS não pode mais usá-lo como "o que está tocando"
-// (com ele só pausado, a tela de bloqueio mostrava ▶ até tocar no play uma vez).
-function release(el) {
-  el.pause();
-  el.removeAttribute('src');
-  el.load();
-  if (urls.has(el)) { URL.revokeObjectURL(urls.get(el)); urls.delete(el); }
-}
-
-// v5 reafirmava na hora e não adiantou: o iOS processa a pausa do elemento anterior depois.
-// Tocar no ▶ da tela de bloqueio (que chama play() de novo) corrigia o ícone, então repetimos isso com atraso.
-function reassertPlaying(i) {
-  setTimeout(() => {
-    if (index !== i || active().paused) return;
-    applyAudioSession();
-    setMediaSession(tracks[i]);
-    setPlaybackState('playing');
-    active().play().catch(() => {});
-    log(`reafirmou "tocando" (faixa ${i + 1}) · estado=${navigator.mediaSession?.playbackState}`);
-  }, 600);
-}
-
 function setPlaybackState(state) {
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = state;
 }
@@ -273,8 +251,8 @@ async function playIndex(i, reason) {
     setMediaSession(tracks[i]);
     cur = players.indexOf(el); // antes do play(), para os eventos do novo elemento contarem como ativos
     await el.play();
-    if (el !== old) release(old); // só solta a anterior depois que a nova já está tocando
-    reassertPlaying(i);
+    if (el !== old) old.pause(); // só pausa a anterior depois que a nova já está tocando
+    setPlaybackState('playing');
   } catch (err) { log(`erro ao tocar faixa ${i + 1}: ${err.message}`); }
   advancing = false;
 }
@@ -309,8 +287,6 @@ for (const el of players) {
     $('time').textContent = `${fmt(el.currentTime)} / ${fmt(el.duration)}`;
     if (!('setPositionState' in navigator.mediaSession)) return;
     try { navigator.mediaSession.setPositionState({ duration: el.duration, position: el.currentTime, playbackRate: 1 }); } catch {}
-    // No iOS, setPositionState faz a tela de bloqueio esquecer o estado: precisa reafirmar depois de cada chamada.
-    setPlaybackState(el.paused ? 'paused' : 'playing');
   });
 }
 
