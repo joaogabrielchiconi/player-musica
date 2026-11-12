@@ -24,6 +24,9 @@
 [hidden] { display: none !important; } /* senão o display: flex de .mini vence o hidden */
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.4 var(--font); caret-color: var(--orange); }
+/* App, não página: segurar o dedo numa música não seleciona o texto nem abre o menu Copiar/Pesquisar. Campos de texto continuam normais. */
+body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea { -webkit-user-select: text; user-select: text; }
 ::selection { background: var(--orange); color: var(--on-orange); }
 button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
 button:focus-visible, input:focus-visible, li.row:focus-visible, .seek:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
