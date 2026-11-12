@@ -11,6 +11,8 @@
     h1 { font-size: 20px; }
     .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
     button { min-height: 44px; padding: 0 16px; border: 1px solid #333; border-radius: 10px; background: #222; color: #eee; font: inherit; }
+    #covers figure { display: flex; gap: 12px; align-items: center; margin: 12px 0; }
+    #covers img, #covers .none { width: 72px; height: 72px; object-fit: cover; border-radius: 6px; background: #222; flex: none; }
     #out { white-space: pre-wrap; font: 13px/1.5 ui-monospace, Menlo, monospace; background: #000; border: 1px solid #333; border-radius: 8px; padding: 8px; }
   </style>
 </head>
@@ -21,13 +23,16 @@
     <button id="list">2. Listar Músicas</button>
     <button id="range">3. Ler 64 KB da 1ª faixa</button>
     <button id="expire">4. Simular token vencido</button>
+    <button id="tags">5. Ler tags (T4)</button>
   </div>
   <div id="out" aria-live="polite"></div>
+  <div id="covers"></div>
 
   <script type="module">
     import { signIn, getToken, tokenMinutesLeft, clearToken } from '../js/auth.js';
     import { createDrive } from '../js/drive.js';
     import { put, get } from '../js/db.js';
+    import { readTags } from '../js/tags.js';
 
     const out = document.getElementById('out');
     const say = (msg) => { out.textContent += `${new Date().toLocaleTimeString('pt-BR')} ${msg}\n`; };
@@ -73,6 +78,25 @@
         say(`token apagado: ${getToken() === null} · pasta ainda salva no aparelho: ${Boolean(await get('meta', 'folderId'))}`);
         say('Agora toque em "1. Entrar com Google" de novo.');
       }
+    };
+
+    document.getElementById('tags').onclick = async () => {
+      if (!tracks.length) return say('liste a pasta antes (botão 2)');
+      const covers = document.getElementById('covers');
+      covers.textContent = '';
+      for (const file of tracks) {
+        try {
+          const t0 = performance.now();
+          const t = await readTags(file, drive);
+          const fig = document.createElement('figure');
+          const img = t.art ? Object.assign(document.createElement('img'), { src: URL.createObjectURL(t.art), alt: 'Capa' }) : Object.assign(document.createElement('div'), { className: 'none' });
+          const cap = document.createElement('figcaption');
+          cap.textContent = `${t.title} · ${t.artist} · ${t.album}${t.trackNo ? ` · faixa ${t.trackNo}` : ''} · capa: ${t.art ? `${(t.art.size / 1024).toFixed(0)} KB` : 'não'} · ${((performance.now() - t0) / 1000).toFixed(1)} s`;
+          fig.append(img, cap);
+          covers.append(fig);
+        } catch (err) { fail(err); }
+      }
+      say('tags lidas (veja abaixo do registro)');
     };
 
     status();

@@ -112,21 +112,21 @@ Também mede o tempo entre o toque e o início do som.
 
 ### T4: Leitura de tags
 
-**Descrição:** `js/tags.js` lê título, artista, álbum, número da faixa e capa dos primeiros 512 KB, ou do tamanho exato da tag ID3 quando ela for maior. Sem tag, usa `titleFromFilename` e o nome da subpasta. **Pedir aprovação** da biblioteca escolhida antes de copiá-la para `vendor/`.
+**Descrição:** `js/tags.js` lê título, artista, álbum, número da faixa e capa dos primeiros 512 KB, ou do tamanho exato da tag ID3 quando ela for maior. Sem tag, usa `titleFromFilename` e o nome da subpasta. Leitor próprio, sem dependência (decisão do usuário).
 
 **Critérios de aceite:**
-- [ ] Um MP3 com ID3v2 e capa retorna todos os campos e a capa como Blob.
-- [ ] Um arquivo sem tag retorna os dados do nome do arquivo ("Artista - Título") e o álbum da subpasta.
-- [ ] Uma capa maior que 512 KB é lida inteira.
+- [x] Um MP3 com ID3v2 e capa retorna todos os campos e a capa como Blob.
+- [x] Um arquivo sem tag retorna os dados do nome do arquivo ("Artista - Título") e o álbum da subpasta.
+- [x] Uma capa maior que 512 KB é lida inteira.
 
 **Verificação:**
-- [ ] `node --test tests/tags.test.js` (fixtures em `tests/fixtures/`).
+- [x] `node --test tests/tags.test.js` (9 testes; tags ID3 montadas no próprio teste, sem fixtures binárias).
 
-**Depende de:** T1 · **Arquivos:** `js/tags.js`, `vendor/…`, `tests/tags.test.js`, `tests/fixtures/*` · **Tamanho:** M
+**Depende de:** T1 · **Arquivos:** `js/tags.js`, `tests/tags.test.js` (tags montadas no próprio teste) · **Tamanho:** M
 
 ### Checkpoint: Fundação
-- [ ] `node --test` passa.
-- [ ] Quando o token vence, o app pede "Entrar" sem quebrar nem perder dados.
+- [x] `node --test` passa.
+- [x] Quando o token vence, o app pede "Entrar" sem quebrar nem perder dados.
 
 ---
 

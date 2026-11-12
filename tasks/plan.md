@@ -81,7 +81,7 @@ contas (T0)
 | Baixar a faixa inteira antes de tocar demora demais no 4G | Médio | T1 mede. Acima de ~5 s, criar uma tarefa de streaming com Range via service worker. |
 | O iOS apaga os dados do app (downloads e playlists) | Médio | `navigator.storage.persist()`, backup das playlists no Drive (T12) e app instalado na Tela de Início (fica fora da limpeza de 7 dias). |
 | Token expira no meio da sincronização ou de um download | Médio | `drive.js` repete a chamada uma vez depois de renovar. A sincronização é idempotente e pode ser retomada. |
-| Biblioteca de tags pesada ou abandonada | Baixo | Escolher em T4 com aprovação. O nome do arquivo é a alternativa sempre disponível. |
+| Leitor de tags próprio não cobre algum arquivo raro | Baixo | Cai no nome do arquivo. Testes cobrem ID3v2.2/2.3/2.4, UTF-16 e capa grande. |
 | M4A com metadados no fim do arquivo fica sem tags | Baixo | Usar o nome do arquivo. Se incomodar, ler também o fim do arquivo. |
 
 ## Perguntas em aberto

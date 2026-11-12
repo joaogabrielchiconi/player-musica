@@ -85,7 +85,7 @@ Ouvir a biblioteca pessoal de músicas guardada no Google Drive sem pagar stream
 ### Tags (`tags`)
 
 - O app baixa os primeiros 512 KB do arquivo. Se o cabeçalho ID3v2 indicar uma tag maior (capa grande), baixa até o tamanho exato da tag.
-- Uma biblioteca de tags, copiada para `vendor/` e sem CDN em tempo de execução. Ela é escolhida na tarefa de `tags` e precisa de aprovação, porque é uma dependência nova.
+- Leitor próprio de ID3v2.2/2.3/2.4 em `js/tags.js`, sem dependência (decisão do usuário na T4). M4A não tem leitor: usa o nome do arquivo.
 - Quando faltar tag, o título vem do nome do arquivo sem a extensão; o padrão "Artista - Título" é reconhecido. O artista fica "Desconhecido" e o álbum é o nome da subpasta, ou "Sem álbum".
 - Arquivos M4A com o bloco de metadados no fim do arquivo podem cair nesse mesmo caminho do nome do arquivo.
 - O app só relê as tags de um arquivo se o `md5Checksum` dele mudar.
@@ -116,7 +116,7 @@ Ouvir a biblioteca pessoal de músicas guardada no Google Drive sem pagar stream
 ## Tech Stack
 
 - HTML, CSS e JavaScript (módulos ES nativos), sem framework, bundler nem etapa de build.
-- Uma biblioteca de tags em `vendor/`. Nenhuma outra dependência em tempo de execução.
+- Nenhuma dependência em tempo de execução (o leitor de tags é próprio).
 - Testes: executor de testes nativo do Node (Node v24 instalado), sem dependências.
 - Hospedagem: GitHub Pages, publicado a partir da branch `main`, na raiz do repositório.
 
@@ -146,7 +146,6 @@ js/config.js            → Client ID do Google (público)
 js/app.js               → inicialização e roteamento das abas
 js/auth.js  js/drive.js  js/db.js  js/tags.js
 js/library.js  js/player.js  js/offline.js  js/playlists.js  js/ui.js
-vendor/                 → biblioteca de tags (copiada, com licença)
 icons/                  → ícones do app
 tests/                  → testes da lógica pura (*.test.js)
 docs/google-cloud.md    → passo a passo da credencial OAuth
@@ -226,6 +225,6 @@ export function groupByAlbum(tracks) {
 
 ## Perguntas em aberto
 
-1. **Biblioteca de tags:** é escolhida e aprovada na tarefa de `tags`.
+Nenhuma pergunta em aberto.
 
 As outras perguntas foram respondidas: login por popup; tempo até tocar aceitável no 4G; repositório `joaogabrielchiconi/player-musica`.
