@@ -148,13 +148,13 @@ Também mede o tempo entre o toque e o início do som.
 - A sincronização roda ao abrir (com internet) e pelo botão "Atualizar biblioteca", mostrando o progresso.
 
 **Critérios de aceite:**
-- [ ] Uma faixa nova no Drive aparece depois de "Atualizar".
-- [ ] A segunda sincronização sem mudanças não baixa nenhum byte de áudio.
-- [ ] Faixa apagada do Drive continua no `db`, marcada como removida.
+- [x] Uma faixa nova no Drive aparece depois de "Atualizar".
+- [x] A segunda sincronização sem mudanças não baixa nenhum byte de áudio.
+- [x] Faixa apagada do Drive continua no `db`, marcada como removida.
 
 **Verificação:**
-- [ ] `node --test tests/library.test.js`
-- [ ] Manual: adicionar e apagar uma faixa no Drive, sincronizar no iPhone e conferir.
+- [x] `node --test tests/library.test.js`
+- [x] Manual no iPhone (12/11/2026): 3 músicas sincronizadas; 2ª rodada "nada mudou"; faixa tirada do Drive ficou com "removida do Drive"; ao voltar, foi lida de novo e a marca saiu.
 
 **Depende de:** T2, T3, T4 · **Arquivos:** `js/library.js`, `js/app.js`, `tests/library.test.js` · **Tamanho:** M
 
