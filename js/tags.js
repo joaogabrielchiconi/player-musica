@@ -1,7 +1,9 @@
 // Leitor próprio de tags ID3v2 (2.2, 2.3, 2.4): título, artista, álbum, faixa e capa.
 // Sem tag (ou M4A), os dados vêm do nome do arquivo e da subpasta.
 
-const PROBE_BYTES = 512 * 1024;
+// Tag sem capa cabe aqui; com capa, o cabeçalho diz o tamanho e um 2º pedido busca o resto.
+// (512 KB por faixa daria ~1 GB de download numa biblioteca de 2000 músicas.)
+const PROBE_BYTES = 64 * 1024;
 const MAX_TAG_BYTES = 20 * 1024 * 1024; // proteção contra cabeçalho corrompido
 
 const syncsafe = (b, i) => ((b[i] & 0x7f) << 21) | ((b[i + 1] & 0x7f) << 14) | ((b[i + 2] & 0x7f) << 7) | (b[i + 3] & 0x7f);

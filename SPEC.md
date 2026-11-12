@@ -84,7 +84,7 @@ Ouvir a biblioteca pessoal de músicas guardada no Google Drive sem pagar stream
 
 ### Tags (`tags`)
 
-- O app baixa os primeiros 512 KB do arquivo. Se o cabeçalho ID3v2 indicar uma tag maior (capa grande), baixa até o tamanho exato da tag.
+- O app baixa os primeiros 64 KB do arquivo (512 KB daria ~1 GB numa biblioteca de 2000 músicas). Se o cabeçalho ID3v2 indicar uma tag maior (capa grande), baixa até o tamanho exato da tag.
 - Leitor próprio de ID3v2.2/2.3/2.4 em `js/tags.js`, sem dependência (decisão do usuário na T4). M4A não tem leitor: usa o nome do arquivo.
 - Quando faltar tag, o título vem do nome do arquivo sem a extensão; o padrão "Artista - Título" é reconhecido. O artista fica "Desconhecido" e o álbum é o nome da subpasta, ou "Sem álbum".
 - Arquivos M4A com o bloco de metadados no fim do arquivo podem cair nesse mesmo caminho do nome do arquivo.

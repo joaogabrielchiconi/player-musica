@@ -1,0 +1,15 @@
+/* Visual provisório: o design definitivo sai da T13 (impeccable). */
+:root { --bg: #111; --fg: #eee; --muted: #999; --line: #2a2a2a; --accent: #f5a524; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.4 -apple-system, system-ui, sans-serif;
+       padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 16px); }
+h1 { font-size: 28px; margin: 0 0 8px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+button { min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 10px; background: #222; color: var(--fg); font: inherit; }
+button:disabled { opacity: .5; }
+.status { color: var(--muted); font-size: 14px; min-height: 1.4em; margin: 8px 0; }
+.tracks { list-style: none; margin: 0; padding: 0; }
+.tracks li { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.tracks .title { display: block; }
+.tracks .sub { display: block; color: var(--muted); font-size: 14px; }
+.tracks .removed { color: var(--accent); }

@@ -112,7 +112,7 @@ Também mede o tempo entre o toque e o início do som.
 
 ### T4: Leitura de tags
 
-**Descrição:** `js/tags.js` lê título, artista, álbum, número da faixa e capa dos primeiros 512 KB, ou do tamanho exato da tag ID3 quando ela for maior. Sem tag, usa `titleFromFilename` e o nome da subpasta. Leitor próprio, sem dependência (decisão do usuário).
+**Descrição:** `js/tags.js` lê título, artista, álbum, número da faixa e capa dos primeiros 64 KB (eram 512 KB; reduzido na T5), ou do tamanho exato da tag ID3 quando ela for maior. Sem tag, usa `titleFromFilename` e o nome da subpasta. Leitor próprio, sem dependência (decisão do usuário).
 
 **Critérios de aceite:**
 - [x] Um MP3 com ID3v2 e capa retorna todos os campos e a capa como Blob.
