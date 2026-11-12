@@ -134,7 +134,7 @@ $('list').onclick = async () => {
 };
 
 // ---------- experimentos (v2): som mudo na troca de faixa com a tela bloqueada ----------
-const VERSION = 'v4';
+const VERSION = 'v5';
 // v2 confirmou: as duas opções juntas resolvem o som mudo com a tela bloqueada.
 const OPTS = { optSession: ['opt_session', true], optTwo: ['opt_two', true] };
 const opts = {};
@@ -219,6 +219,15 @@ function getBlob(i) {
 
 // O iOS deduz o ícone ▶/⏸ da tela de bloqueio pelo último elemento que pausou; com dois elementos, a pausa
 // do anterior fazia o ícone ficar em ▶ com a música tocando. Por isso o estado é informado explicitamente.
+// Esvazia o elemento anterior: sem fonte, o iOS não pode mais usá-lo como "o que está tocando"
+// (com ele só pausado, a tela de bloqueio mostrava ▶ até tocar no play uma vez).
+function release(el) {
+  el.pause();
+  el.removeAttribute('src');
+  el.load();
+  if (urls.has(el)) { URL.revokeObjectURL(urls.get(el)); urls.delete(el); }
+}
+
 function setPlaybackState(state) {
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = state;
 }
@@ -251,8 +260,11 @@ async function playIndex(i, reason) {
     setMediaSession(tracks[i]);
     cur = players.indexOf(el); // antes do play(), para os eventos do novo elemento contarem como ativos
     await el.play();
-    if (el !== old) old.pause(); // só pausa a anterior depois que a nova já está tocando
+    if (el !== old) release(old); // só solta a anterior depois que a nova já está tocando
+    // Reafirma o estado depois da troca: só "playing" de novo não muda nada para o iOS.
+    setPlaybackState('paused');
     setPlaybackState('playing');
+    setMediaSession(tracks[i]);
   } catch (err) { log(`erro ao tocar faixa ${i + 1}: ${err.message}`); }
   advancing = false;
 }
