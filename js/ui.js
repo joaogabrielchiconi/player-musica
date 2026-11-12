@@ -1,4 +1,4 @@
-// Telas da biblioteca: abas Músicas, Artistas, Álbuns e Baixadas, busca, detalhe de artista/álbum e downloads (T6, T10).
+// Telas da biblioteca: abas Músicas, Artistas, Álbuns, Playlists e Baixadas, busca, detalhes, downloads e playlists (T6, T10, T11).
 // Visual provisório: o design definitivo sai da T13.
 import { groupByAlbum, groupByArtist, searchTracks, sortTracks } from './library.js';
 
@@ -21,11 +21,14 @@ const el = (tag, props = {}, ...children) => {
  * @param {(track: object) => boolean} o.isDownloaded
  * @param {(track: object) => boolean} o.isAvailable  toca agora (com internet, ou baixada)
  * @param {object} o.downloads  state(id), percent(id), add(list), toggle(t), removeAll(list), progressText(), spaceText()
+ * @param {object} o.playlists  list(), get(id), tracksOf(pl), create(name), rename(id, name), remove(id), add(id, ids), removeAt(id, i), move(id, from, to)
+ * @param {(text: string) => void} o.toast
  */
-export function createLibraryUI({ root, title, back, search, tabs, getArt, onPlay, onlyDownloaded, isDownloaded, isAvailable, downloads }) {
+export function createLibraryUI({ root, title, back, search, tabs, getArt, onPlay, onlyDownloaded, isDownloaded, isAvailable, downloads, playlists, toast }) {
   let tracks = [];
   let tab = 'songs';
-  let detail = null; // { kind: 'artist' | 'album', group }
+  let detail = null; // { kind: 'artist' | 'album' | 'playlist', group } (playlist: group = { id })
+  let editing = false; // detalhe de playlist em modo de edição (▲ ▼ ✕)
   const artUrls = new Map(); // albumKey -> object URL (fica enquanto o app está aberto)
   let dlButtons = new Map(); // id -> [{ t, b }] dos botões de download na tela, para atualizar o %
   let progressEl = null; // linha de progresso da aba Baixadas, quando aberta
@@ -42,11 +45,11 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
   }
 
   // Baixar todas / baixando / apagar downloads de um álbum ou artista.
-  function bulkButton(list) {
+  function bulkButton(list, what = 'todas') {
     const states = list.map((t) => downloads.state(t.id));
     const missing = states.filter((s) => !s).length;
     if (missing) {
-      const text = missing === list.length ? `Baixar todas (${missing})` : `Baixar as ${missing} que faltam`;
+      const text = missing === list.length ? `Baixar ${what} (${missing})` : `Baixar as ${missing} que faltam`;
       return el('button', { className: 'bulk', textContent: text, onclick: () => downloads.add(list) });
     }
     if (states.some((s) => s !== 'done')) return el('button', { className: 'bulk', textContent: 'Baixando…', disabled: true });
@@ -72,10 +75,14 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
       if (t.removedFromDrive) li.append(el('span', { className: 'sub removed', textContent: 'removida do Drive' }));
       if (!isAvailable(t)) { li.classList.add('off'); li.ariaDisabled = 'true'; } // sem internet e não baixada
       li.onclick = () => onPlay(t, list);
+      const add = el('button', {
+        className: 'add', type: 'button', textContent: '+', ariaLabel: `Adicionar ${t.title} a uma playlist`,
+        onclick: (e) => { e.stopPropagation(); pickPlaylist([t.id]); },
+      });
       const b = el('button', { className: 'dl', type: 'button' });
       setDl(b, t);
       b.onclick = (e) => { e.stopPropagation(); downloads.toggle(t); };
-      li.append(b);
+      li.append(add, b);
       if (!dlButtons.has(t.id)) dlButtons.set(t.id, []);
       dlButtons.get(t.id).push({ t, b });
       frag.append(li);
@@ -100,9 +107,104 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
 
   const count = (n) => `${n} música${n === 1 ? '' : 's'}`;
 
+  // ---- playlists (T11) ----
+  const askName = (initial = '') => prompt('Nome da playlist:', initial); // provisório: o design final troca por uma tela própria
+
+  // Folha de baixo: escolhe a playlist (ou cria uma) para receber as faixas.
+  function pickPlaylist(ids) {
+    const close = () => overlay.remove();
+    const done = async (id) => {
+      const n = await playlists.add(id, ids);
+      close();
+      toast(n ? `${n} música(s) em "${playlists.get(id).name}".` : `Já estava em "${playlists.get(id).name}".`);
+    };
+    const list = el('ul', { className: 'sheet-list' });
+    for (const pl of playlists.list()) {
+      list.append(el('li', {}, el('button', { textContent: `${pl.name} · ${count(pl.trackIds.length)}`, onclick: () => done(pl.id) })));
+    }
+    const create = el('button', {
+      textContent: '+ Nova playlist',
+      onclick: async () => {
+        const name = askName();
+        if (!name) return;
+        const pl = await playlists.create(name);
+        if (pl) await done(pl.id); else toast('Nome inválido.');
+      },
+    });
+    const overlay = el('div', { className: 'sheet', onclick: (e) => { if (e.target === overlay) close(); } },
+      el('div', { className: 'sheet-body', role: 'dialog', ariaLabel: 'Adicionar à playlist' },
+        el('h2', { textContent: `Adicionar ${count(ids.length)} a…` }), list, create,
+        el('button', { textContent: 'Cancelar', onclick: close })));
+    document.body.append(overlay);
+  }
+  const addAllButton = (list) => el('button', { className: 'bulk', textContent: '+ Adicionar à playlist', onclick: () => pickPlaylist(list.map((t) => t.id)) });
+
+  function renderPlaylistList() {
+    const all = playlists.list();
+    root.append(el('button', {
+      className: 'bulk', textContent: '+ Nova playlist',
+      onclick: async () => {
+        const name = askName();
+        if (!name) return;
+        const pl = await playlists.create(name);
+        if (pl) openDetail('playlist', { id: pl.id }); else toast('Nome inválido.');
+      },
+    }));
+    if (!all.length) return root.append(el('p', { className: 'status', textContent: 'Nenhuma playlist ainda.' }));
+    root.append(groupList(all, (pl) => ({ title: pl.name, sub: count(playlists.tracksOf(pl).length) }), (pl) => openDetail('playlist', { id: pl.id })));
+  }
+
+  // Modo de edição: ▲ ▼ mexem na ordem (em relação à faixa vizinha da lista) e ✕ tira da playlist.
+  function editRows(pl, list) {
+    const ul = el('ul', { className: 'tracks' });
+    const ctl = (text, label, onclick, disabled = false) => el('button', { className: 'ctl', type: 'button', textContent: text, ariaLabel: label, disabled, onclick });
+    list.forEach((t, i) => {
+      const idx = pl.trackIds.indexOf(t.id);
+      ul.append(el('li', { className: 'row edit' },
+        el('span', { className: 'title', textContent: t.title }),
+        el('span', { className: 'sub', textContent: t.artist }),
+        el('span', { className: 'ctls' },
+          ctl('▲', `Subir ${t.title}`, () => playlists.move(pl.id, idx, pl.trackIds.indexOf(list[i - 1].id)), i === 0),
+          ctl('▼', `Descer ${t.title}`, () => playlists.move(pl.id, idx, pl.trackIds.indexOf(list[i + 1].id)), i === list.length - 1),
+          ctl('✕', `Tirar ${t.title} da playlist`, () => playlists.removeAt(pl.id, idx)))));
+    });
+    return ul;
+  }
+
+  function renderPlaylist(id) {
+    const pl = playlists.get(id);
+    if (!pl) { detail = null; return render(); } // foi apagada
+    title.textContent = pl.name;
+    const list = playlists.tracksOf(pl);
+    const hidden = pl.trackIds.length - list.length;
+    root.append(
+      el('p', { className: 'sub', textContent: `${count(list.length)}${hidden ? ` · ${hidden} fora da biblioteca` : ''}` }),
+      el('div', { className: 'actions' },
+        el('button', { textContent: '▶︎ Tocar', disabled: !list.some(isAvailable), onclick: () => onPlay(list.find(isAvailable), list) }),
+        el('button', { textContent: editing ? 'Pronto' : 'Editar', onclick: () => { editing = !editing; render(); } })),
+    );
+    if (list.length) root.append(bulkButton(list, 'playlist'));
+    else root.append(el('p', { className: 'status', textContent: 'Playlist vazia. Toque em + numa música, ou em "Adicionar à playlist" num álbum.' }));
+    root.append(editing ? editRows(pl, list) : trackList(list));
+    if (editing) {
+      root.append(el('div', { className: 'actions' },
+        el('button', { textContent: 'Renomear', onclick: () => { const name = askName(pl.name); if (name) playlists.rename(pl.id, name); } }),
+        el('button', {
+          className: 'danger', textContent: 'Apagar playlist',
+          onclick: () => {
+            if (!confirm(`Apagar a playlist "${pl.name}"? As músicas e os downloads não são apagados.`)) return;
+            editing = false;
+            detail = null;
+            playlists.remove(pl.id);
+          },
+        })));
+    }
+  }
+
   function openDetail(kind, group) {
     // O álbum aberto a partir de um artista lembra de onde veio, para o "voltar".
     detail = { kind, group, from: detail?.kind === 'artist' ? detail : null };
+    editing = false;
     window.scrollTo(0, 0);
     render();
   }
@@ -111,7 +213,7 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
     const cover = el('div', { className: 'cover' });
     const head = el('div', { className: 'album-head' }, cover,
       el('div', {}, el('p', { className: 'title', textContent: g.artist }), el('p', { className: 'sub', textContent: count(g.tracks.length) }),
-        bulkButton(g.tracks)));
+        bulkButton(g.tracks), addAllButton(g.tracks)));
     root.append(head, trackList(g.tracks, { showAlbum: false, numbered: true }));
     const url = g.hasArt ? await artUrl(g.key) : null;
     if (url) cover.append(el('img', { src: url, alt: `Capa de ${g.album}` }));
@@ -124,16 +226,21 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
     const q = search.value;
     for (const b of tabs) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
     back.hidden = !detail;
-    search.hidden = Boolean(detail);
+    search.hidden = Boolean(detail) || tab === 'playlists';
 
+    if (detail?.kind === 'playlist') return renderPlaylist(detail.group.id);
     if (detail?.kind === 'album') {
       title.textContent = detail.group.album;
       return renderAlbum(detail.group);
     }
     if (detail?.kind === 'artist') {
       title.textContent = detail.group.artist;
-      return root.append(bulkButton(detail.group.tracks), groupList(detail.group.albums,
+      return root.append(bulkButton(detail.group.tracks), addAllButton(detail.group.tracks), groupList(detail.group.albums,
         (a) => ({ title: a.album, sub: count(a.tracks.length) }), (a) => openDetail('album', a)));
+    }
+    if (tab === 'playlists') {
+      title.textContent = 'Playlists';
+      return renderPlaylistList();
     }
 
     const pool = onlyDownloaded.checked ? tracks.filter(isDownloaded) : tracks;
@@ -167,10 +274,10 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
     }
   }
 
-  for (const b of tabs) b.onclick = () => { tab = b.dataset.tab; detail = null; render(); };
-  back.onclick = () => { detail = detail?.from ?? null; render(); };
+  for (const b of tabs) b.onclick = () => { tab = b.dataset.tab; detail = null; editing = false; render(); };
+  back.onclick = () => { detail = detail?.from ?? null; editing = false; render(); };
   search.oninput = render;
-  onlyDownloaded.onchange = () => { detail = null; render(); };
+  onlyDownloaded.onchange = () => { detail = null; editing = false; render(); };
 
   return {
     refresh: render, // a internet caiu ou voltou, ou um download mudou: redesenha sem sair da tela atual
@@ -183,6 +290,7 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
       tracks = list;
       // Depois de sincronizar, um detalhe aberto pode ter mudado: volta para a aba.
       detail = null;
+      editing = false;
       render();
     },
   };

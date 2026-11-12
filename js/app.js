@@ -1,4 +1,4 @@
-// Inicialização do app: login, sincronização da biblioteca, abas, player, retomada, offline e downloads (T5 a T10).
+// Inicialização do app: login, sincronização da biblioteca, abas, player, retomada, offline, downloads e playlists (T5 a T11).
 import { handleAuthReturn, signIn, getToken, clearToken } from './auth.js';
 import { createDrive } from './drive.js';
 import * as db from './db.js';
@@ -7,6 +7,7 @@ import { createLibraryUI, createPlayerUI } from './ui.js';
 import { createPlayer } from './player.js';
 import { serializeState, restoreState } from './queue.js';
 import { createOffline } from './offline.js';
+import { createPlaylists, tracksOf } from './playlists.js';
 
 const $ = (id) => document.getElementById(id);
 const drive = createDrive({ getToken, onUnauthorized: () => { clearToken(); return null; } });
@@ -69,8 +70,23 @@ addEventListener('online', () => setOnline(true));
 addEventListener('offline', () => setOnline(false));
 const isAvailable = (t) => online || offline.has(t.id);
 
+// ---- playlists (T11) ----
+let library = []; // faixas do banco, para nomes no painel, espaço usado e playlists
+let libraryById = new Map();
+const playlistStore = createPlaylists({ db, onChange: () => ui.refresh() });
+const playlists = {
+  list: playlistStore.list,
+  get: playlistStore.get,
+  create: playlistStore.create,
+  rename: playlistStore.rename,
+  remove: playlistStore.remove,
+  add: playlistStore.add,
+  removeAt: playlistStore.removeAt,
+  move: playlistStore.move,
+  tracksOf: (pl) => tracksOf(pl, libraryById),
+};
+
 // ---- downloads (T10) ----
-let library = []; // faixas do banco, para nomes no painel e o espaço usado
 const offline = createOffline({
   db,
   drive,
@@ -171,11 +187,14 @@ const ui = createLibraryUI({
   isDownloaded: (t) => offline.has(t.id),
   isAvailable,
   downloads,
+  playlists,
+  toast,
 });
 
 async function render() {
   const tracks = await db.getAll('tracks');
   library = tracks;
+  libraryById = new Map(tracks.map((t) => [t.id, t]));
   ui.setTracks(tracks);
   return tracks.length;
 }
@@ -217,6 +236,7 @@ async function start() {
   db.persist().catch(() => {});
   refreshButtons();
   await offline.init().catch(() => {});
+  await playlistStore.init().catch(() => {}); // banco ilegível: abre sem playlists, sem quebrar o resto
   await restorePlayer().catch(() => {}); // estado ilegível: abre com o player vazio
   const n = await render();
   if (!getToken()) return setStatus(n ? `${n} música(s) · entre para atualizar` : 'Entre com o Google para carregar suas músicas.');
