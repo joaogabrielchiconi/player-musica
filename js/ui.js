@@ -1,6 +1,6 @@
 // Telas da biblioteca e do player (T6 a T13). Visual: direção "fita cassete" (ver PRODUCT.md e DESIGN.md).
 // Só interface: nenhuma regra de tocar, baixar ou guardar mora aqui.
-import { groupByAlbum, groupByArtist, searchTracks, sortTracks } from './library.js';
+import { groupByArtist, searchTracks, sortTracks } from './library.js';
 import { askText, confirmDialog, openSheet } from './dialogs.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -29,7 +29,7 @@ const chipColor = (s) => {
   return CHIPS[h % CHIPS.length];
 };
 const count = (n) => `${n} música${n === 1 ? '' : 's'}`;
-const TAB_TITLE = { songs: 'Músicas', artists: 'Artistas', albums: 'Álbuns', playlists: 'Playlists', downloads: 'Baixadas' };
+const TAB_TITLE = { songs: 'Músicas', artists: 'Artistas', playlists: 'Playlists', downloads: 'Baixadas' };
 
 function emptyState(iconName, heading, text) {
   return el('div', { className: 'empty' }, icon(iconName), el('h2', { textContent: heading }), text ? el('p', { textContent: text }) : '');
@@ -311,10 +311,6 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
       const groups = groupByArtist(found);
       setCount(groups.length);
       root.append(groupList(groups, (g) => ({ title: g.artist, sub: `${g.albums.length} álbum(ns) · ${count(g.tracks.length)}` }), (g) => openDetail('artist', g), { chip: null }));
-    } else if (tab === 'albums') {
-      const groups = groupByAlbum(found);
-      setCount(groups.length);
-      root.append(groupList(groups, (g) => ({ title: g.album, sub: `${g.artist} · ${count(g.tracks.length)}` }), (g) => openDetail('album', g)));
     } else {
       const mine = sortTracks(found.filter(isDownloaded));
       setCount(mine.length);
