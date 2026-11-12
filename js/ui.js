@@ -1,4 +1,4 @@
-// Telas da biblioteca (T6): abas Músicas, Artistas e Álbuns, busca e detalhe de artista/álbum.
+// Telas da biblioteca: abas Músicas, Artistas, Álbuns e Baixadas, busca, detalhe de artista/álbum e downloads (T6, T10).
 // Visual provisório: o design definitivo sai da T13.
 import { groupByAlbum, groupByArtist, searchTracks, sortTracks } from './library.js';
 
@@ -20,12 +20,38 @@ const el = (tag, props = {}, ...children) => {
  * @param {HTMLInputElement} o.onlyDownloaded  filtro "Só baixadas"
  * @param {(track: object) => boolean} o.isDownloaded
  * @param {(track: object) => boolean} o.isAvailable  toca agora (com internet, ou baixada)
+ * @param {object} o.downloads  state(id), percent(id), add(list), toggle(t), removeAll(list), progressText(), spaceText()
  */
-export function createLibraryUI({ root, title, back, search, tabs, getArt, onPlay, onlyDownloaded, isDownloaded, isAvailable }) {
+export function createLibraryUI({ root, title, back, search, tabs, getArt, onPlay, onlyDownloaded, isDownloaded, isAvailable, downloads }) {
   let tracks = [];
   let tab = 'songs';
   let detail = null; // { kind: 'artist' | 'album', group }
   const artUrls = new Map(); // albumKey -> object URL (fica enquanto o app está aberto)
+  let dlButtons = new Map(); // id -> [{ t, b }] dos botões de download na tela, para atualizar o %
+  let progressEl = null; // linha de progresso da aba Baixadas, quando aberta
+
+  function setDl(b, t) {
+    const s = downloads.state(t.id);
+    const [text, label] = s === 'done' ? ['✓', `Baixada. Toque para apagar o download de ${t.title}`]
+      : s === 'active' ? [`${downloads.percent(t.id)}%`, `Baixando ${t.title}`]
+        : s === 'queued' ? ['…', `${t.title} na fila para baixar. Toque para tirar da fila`]
+          : ['⬇︎', `Baixar ${t.title}`];
+    b.textContent = text;
+    b.ariaLabel = label;
+    b.classList.toggle('done', s === 'done');
+  }
+
+  // Baixar todas / baixando / apagar downloads de um álbum ou artista.
+  function bulkButton(list) {
+    const states = list.map((t) => downloads.state(t.id));
+    const missing = states.filter((s) => !s).length;
+    if (missing) {
+      const text = missing === list.length ? `Baixar todas (${missing})` : `Baixar as ${missing} que faltam`;
+      return el('button', { className: 'bulk', textContent: text, onclick: () => downloads.add(list) });
+    }
+    if (states.some((s) => s !== 'done')) return el('button', { className: 'bulk', textContent: 'Baixando…', disabled: true });
+    return el('button', { className: 'bulk', textContent: 'Apagar downloads', onclick: () => downloads.removeAll(list) });
+  }
 
   async function artUrl(key) {
     if (!artUrls.has(key)) {
@@ -46,6 +72,12 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
       if (t.removedFromDrive) li.append(el('span', { className: 'sub removed', textContent: 'removida do Drive' }));
       if (!isAvailable(t)) { li.classList.add('off'); li.ariaDisabled = 'true'; } // sem internet e não baixada
       li.onclick = () => onPlay(t, list);
+      const b = el('button', { className: 'dl', type: 'button' });
+      setDl(b, t);
+      b.onclick = (e) => { e.stopPropagation(); downloads.toggle(t); };
+      li.append(b);
+      if (!dlButtons.has(t.id)) dlButtons.set(t.id, []);
+      dlButtons.get(t.id).push({ t, b });
       frag.append(li);
     }
     ul.append(frag);
@@ -78,7 +110,8 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
   async function renderAlbum(g) {
     const cover = el('div', { className: 'cover' });
     const head = el('div', { className: 'album-head' }, cover,
-      el('div', {}, el('p', { className: 'title', textContent: g.artist }), el('p', { className: 'sub', textContent: count(g.tracks.length) })));
+      el('div', {}, el('p', { className: 'title', textContent: g.artist }), el('p', { className: 'sub', textContent: count(g.tracks.length) }),
+        bulkButton(g.tracks)));
     root.append(head, trackList(g.tracks, { showAlbum: false, numbered: true }));
     const url = g.hasArt ? await artUrl(g.key) : null;
     if (url) cover.append(el('img', { src: url, alt: `Capa de ${g.album}` }));
@@ -86,6 +119,8 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
 
   function render() {
     root.textContent = '';
+    dlButtons = new Map();
+    progressEl = null;
     const q = search.value;
     for (const b of tabs) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
     back.hidden = !detail;
@@ -97,7 +132,7 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
     }
     if (detail?.kind === 'artist') {
       title.textContent = detail.group.artist;
-      return root.append(groupList(detail.group.albums,
+      return root.append(bulkButton(detail.group.tracks), groupList(detail.group.albums,
         (a) => ({ title: a.album, sub: count(a.tracks.length) }), (a) => openDetail('album', a)));
     }
 
@@ -114,10 +149,21 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
       title.textContent = 'Artistas';
       root.append(groupList(groupByArtist(found),
         (g) => ({ title: g.artist, sub: `${g.albums.length} álbum(ns) · ${count(g.tracks.length)}` }), (g) => openDetail('artist', g)));
-    } else {
+    } else if (tab === 'albums') {
       title.textContent = 'Álbuns';
       root.append(groupList(groupByAlbum(found),
         (g) => ({ title: g.album, sub: `${g.artist} · ${count(g.tracks.length)}` }), (g) => openDetail('album', g)));
+    } else {
+      title.textContent = 'Baixadas';
+      const space = el('p', { className: 'status', textContent: 'Calculando o espaço…' });
+      downloads.spaceText().then((text) => { space.textContent = text; }).catch(() => { space.textContent = ''; });
+      progressEl = el('p', { className: 'status', textContent: downloads.progressText() });
+      root.append(el('div', { className: 'panel' }, space, progressEl));
+      const mine = sortTracks(found.filter(isDownloaded));
+      if (!mine.length) {
+        return root.append(el('p', { className: 'status', textContent: 'Nenhuma música baixada ainda. Toque em ⬇︎ numa música ou em "Baixar todas" num álbum.' }));
+      }
+      root.append(trackList(mine));
     }
   }
 
@@ -127,7 +173,12 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
   onlyDownloaded.onchange = () => { detail = null; render(); };
 
   return {
-    refresh: render, // a internet caiu ou voltou: redesenha sem sair da tela atual
+    refresh: render, // a internet caiu ou voltou, ou um download mudou: redesenha sem sair da tela atual
+    // Só o % de uma faixa mudou: atualiza o botão dela e a linha de progresso, sem redesenhar a lista.
+    updateDownload(id) {
+      for (const { t, b } of dlButtons.get(id) ?? []) setDl(b, t);
+      if (progressEl) progressEl.textContent = downloads.progressText();
+    },
     setTracks(list) {
       tracks = list;
       // Depois de sincronizar, um detalhe aberto pode ter mudado: volta para a aba.

@@ -56,3 +56,10 @@ body.full-open { overflow: hidden; }
 .tracks .row.off { opacity: .4; } /* sem internet e não baixada */
 .toast { position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 130px); z-index: 20; margin: 0;
          padding: 10px 14px; border-radius: 10px; background: #2b2b2b; color: var(--fg); font-size: 14px; text-align: center; }
+.tracks .row { position: relative; padding-right: 52px; }
+.tracks .dl { position: absolute; right: 0; top: 50%; transform: translateY(-50%); min-width: 44px; min-height: 44px;
+              padding: 0; border: 0; background: none; color: var(--muted); font-size: 15px; }
+.tracks .dl.done { color: var(--accent); }
+.bulk { margin: 8px 0; min-height: 40px; }
+.panel { border: 1px solid var(--line); border-radius: 10px; padding: 4px 12px; margin-bottom: 8px; }
+.panel .status:empty { display: none; }
