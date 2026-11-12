@@ -56,7 +56,8 @@ Também mede o tempo entre o toque e o início do som.
 - **Tela bloqueada:** a v1 trocava de faixa sem som. A v2 funcionou com `navigator.audioSession.type = 'playback'` e dois elementos `<audio>` (a próxima faixa começa cerca de 1 s antes do fim da atual). **As duas medidas são obrigatórias no app final.**
 - **Tela de bloqueio:** mostrava ±10 s. A v3 tira os controles nativos e não registra `seekbackward`/`seekforward`; ainda não foi testada.
 - **Tempo até tocar:** faixa pré-carregada 0,0 s. Faixa de 111 MB baixou em 11,3 s no Wi-Fi. O 4G ainda não foi medido.
-- **Fluxo de login:** ___ (redirecionamento ou popup).
+- **Fluxo de login:** o popup funcionou no app instalado. O redirecionamento não foi testado.
+- **Ícone ▶/⏸ da tela de bloqueio:** fica ▶ mesmo tocando. O usuário decidiu deixar assim. As tentativas v5–v7 quebraram a troca automática e foram revertidas para a v4.
 
 ### Checkpoint: Go/no-go
 - [ ] Os critérios 2 e 3 da spec passam no app instalado.
