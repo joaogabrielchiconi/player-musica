@@ -74,12 +74,14 @@ Também mede o tempo entre o toque e o início do som.
 **Descrição:** `js/db.js` com um wrapper mínimo (get, put, delete, getAll por store) para os stores `tracks`, `audio`, `art`, `playlists`, `state` e `meta`. Chama `navigator.storage.persist()` na primeira execução.
 
 **Critérios de aceite:**
-- [ ] Os dados gravados continuam lá depois de fechar e reabrir o app.
-- [ ] Um Blob de áudio de 10 MB grava e lê de volta no Safari do iPhone.
-- [ ] `persist()` é chamado, e o resultado aparece no console.
+- [x] Os dados gravados continuam lá depois de fechar e reabrir o app.
+- [x] Um Blob de áudio de 10 MB grava e lê de volta no Safari do iPhone.
+- [x] `persist()` é chamado, e o resultado aparece no console.
 
 **Verificação:**
-- [ ] Manual: página de debug no iPhone grava, fecha, reabre e lê.
+- [x] Manual: página de debug no iPhone grava, fecha, reabre e lê.
+
+**Resultado (12/11/2026):** no iPhone, leu 10.485.760 bytes e o conteúdo confere. Cota de cerca de 39 GB. `persist()` retornou `false` no navegador; será conferido de novo no app instalado (T9/T10).
 
 **Depende de:** T1 · **Arquivos:** `js/db.js` · **Tamanho:** S
 
