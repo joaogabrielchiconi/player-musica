@@ -1,4 +1,4 @@
-// Inicialização do app: login, sincronização da biblioteca, abas, player, retomada, offline, downloads e playlists (T5 a T11).
+// Inicialização do app: login, sincronização da biblioteca, abas, player, retomada, offline, downloads, playlists e backup (T5 a T12).
 import { handleAuthReturn, signIn, getToken, clearToken } from './auth.js';
 import { createDrive } from './drive.js';
 import * as db from './db.js';
@@ -7,7 +7,7 @@ import { createLibraryUI, createPlayerUI } from './ui.js';
 import { createPlayer } from './player.js';
 import { serializeState, restoreState } from './queue.js';
 import { createOffline } from './offline.js';
-import { createPlaylists, tracksOf } from './playlists.js';
+import { createPlaylists, tracksOf, createPlaylistBackup } from './playlists.js';
 
 const $ = (id) => document.getElementById(id);
 const drive = createDrive({ getToken, onUnauthorized: () => { clearToken(); return null; } });
@@ -63,7 +63,10 @@ function setOnline(value) {
   if (value === online) return;
   online = value;
   setStatus(online ? '' : 'Sem internet: só as músicas baixadas tocam.');
-  if (online) offline.resume(); // downloads parados pela queda continuam
+  if (online) {
+    offline.resume(); // downloads parados pela queda continuam
+    backup.sync().catch(() => {}); // e o backup pendente das playlists
+  }
   ui.refresh();
 }
 addEventListener('online', () => setOnline(true));
@@ -73,7 +76,17 @@ const isAvailable = (t) => online || offline.has(t.id);
 // ---- playlists (T11) ----
 let library = []; // faixas do banco, para nomes no painel, espaço usado e playlists
 let libraryById = new Map();
-const playlistStore = createPlaylists({ db, onChange: () => ui.refresh() });
+const playlistStore = createPlaylists({ db, onChange: () => { ui.refresh(); backup.changed().catch(() => {}); } });
+// Backup no Drive (T12): grava ~3 s depois de cada mudança; restaura depois de sincronizar a biblioteca.
+const backup = createPlaylistBackup({
+  store: playlistStore,
+  drive,
+  db,
+  libraryIds: async () => new Set(await db.keys('tracks')),
+  onRestored: ({ playlists: n, droppedTracks }) => setStatus(`${n} playlist(s) restaurada(s) do backup no Drive.`
+    + (droppedTracks ? ` ${droppedTracks} música(s) não existem mais no Drive e ficaram de fora.` : '')),
+  onError: (err) => { if (isNetworkError(err)) setOnline(false); },
+});
 const playlists = {
   list: playlistStore.list,
   get: playlistStore.get,
@@ -216,6 +229,8 @@ async function sync() {
     const n = await render();
     const changes = [r.added && `${r.added} nova(s)`, r.changed && `${r.changed} alterada(s)`, r.removed && `${r.removed} removida(s)`].filter(Boolean);
     setStatus(`${n} música(s)${changes.length ? ` · ${changes.join(', ')}` : ' · nada mudou'}`);
+    // Biblioteca completa: agora dá para conferir/restaurar o backup das playlists e gravar o pendente.
+    backup.sync({ canRestore: true }).catch((err) => { if (isNetworkError(err)) setOnline(false); });
   } catch (err) {
     const n = await render();
     if (isNetworkError(err)) { setOnline(false); return setStatus(`${n} música(s) · sem internet`); }

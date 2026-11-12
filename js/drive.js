@@ -3,6 +3,7 @@
 import { AuthError } from './auth.js';
 
 const API = 'https://www.googleapis.com/drive/v3';
+const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 const FOLDER = 'application/vnd.google-apps.folder';
 const AUDIO_EXT = /\.(mp3|m4a|aac|flac|wav)$/i;
 
@@ -20,12 +21,15 @@ const quote = (s) => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
  * @param {typeof fetch} [deps.fetch]
  */
 export function createDrive({ getToken, onUnauthorized = () => null, fetch: fetchFn = globalThis.fetch.bind(globalThis) }) {
-  async function request(path, params = {}, headers = {}) {
-    const url = `${API}/${path}${Object.keys(params).length ? `?${new URLSearchParams(params)}` : ''}`;
+  const withParams = (base, params) => `${base}${Object.keys(params).length ? `?${new URLSearchParams(params)}` : ''}`;
+  const request = (path, params = {}, headers = {}) => send(withParams(`${API}/${path}`, params), { headers });
+
+  // Toda chamada passa aqui: põe o token e, no 401, renova uma vez e repete.
+  async function send(url, init) {
     let token = getToken();
     if (!token) throw new AuthError();
     for (let attempt = 0; ; attempt++) {
-      const res = await fetchFn(url, { headers: { ...headers, Authorization: `Bearer ${token}` } });
+      const res = await fetchFn(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${token}` } });
       if (res.status === 401) {
         token = attempt === 0 ? await onUnauthorized() : null;
         if (!token) throw new AuthError('O acesso ao Google expirou. Entre de novo.');
@@ -79,5 +83,45 @@ export function createDrive({ getToken, onUnauthorized = () => null, fetch: fetc
   const downloadRange = (id, start, end) =>
     request(`files/${encodeURIComponent(id)}`, { alt: 'media' }, { Range: `bytes=${start}-${end}` }).then((r) => r.arrayBuffer());
 
-  return { request, listChildren, listAudio, findFolder, download, downloadRange };
+  // ---- appDataFolder (T12): pasta escondida que só este app vê. É a ÚNICA escrita no Drive. ----
+  // Só atualiza arquivo cujo ID veio de uma listagem do appDataFolder (ou que este app criou lá);
+  // qualquer outro ID é recusado antes de chegar à rede.
+  const appDataIds = new Set();
+
+  /** Arquivo do appDataFolder pelo nome (o mais recente), ou null. */
+  async function findAppData(name) {
+    const res = await request('files', {
+      spaces: 'appDataFolder',
+      q: `name = ${quote(name)} and trashed = false`,
+      fields: 'files(id, name, modifiedTime)',
+      orderBy: 'modifiedTime desc',
+      pageSize: '10',
+    });
+    const { files = [] } = await res.json();
+    for (const f of files) appDataIds.add(f.id);
+    return files[0] ?? null;
+  }
+
+  const readAppData = (id) => request(`files/${encodeURIComponent(id)}`, { alt: 'media' }).then((r) => r.text());
+
+  /** Grava texto JSON no appDataFolder: atualiza `id` (se dado) ou cria o arquivo. Devolve o ID. */
+  async function writeAppData(name, text, id = null) {
+    if (id) {
+      if (!appDataIds.has(id)) throw new Error('Gravação recusada: o arquivo não é do appDataFolder deste app.');
+      await send(withParams(`${UPLOAD}/files/${encodeURIComponent(id)}`, { uploadType: 'media' }),
+        { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: text });
+      return id;
+    }
+    const boundary = `b${Math.random().toString(36).slice(2)}`;
+    const meta = JSON.stringify({ name, parents: ['appDataFolder'], mimeType: 'application/json' });
+    const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n`
+      + `--${boundary}\r\nContent-Type: application/json\r\n\r\n${text}\r\n--${boundary}--`;
+    const res = await send(withParams(`${UPLOAD}/files`, { uploadType: 'multipart', fields: 'id' }),
+      { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body });
+    const { id: created } = await res.json();
+    appDataIds.add(created);
+    return created;
+  }
+
+  return { request, listChildren, listAudio, findFolder, download, downloadRange, findAppData, readAppData, writeAppData };
 }

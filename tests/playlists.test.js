@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPlaylists, newPlaylist, addTracks, removeTrackAt, moveTrack, tracksOf, sanitize, cleanName } from '../js/playlists.js';
+import { createPlaylists, newPlaylist, addTracks, removeTrackAt, moveTrack, tracksOf, sanitize, cleanName, createPlaylistBackup, toBackup, fromBackup, BACKUP_FILE } from '../js/playlists.js';
 
 function memDb() {
   const m = new Map();
@@ -94,4 +94,134 @@ test('lista: a mexida mais recentemente vem primeiro', async () => {
   await p.add(a.id, ['x']);
   assert.deepEqual(p.list().map((x) => x.name), ['A', 'B']);
   assert.ok(b);
+});
+
+// ---- backup no Drive (T12) ----
+function fullDb() {
+  const stores = new Map();
+  const s = (n) => stores.get(n) ?? stores.set(n, new Map()).get(n);
+  return {
+    stores,
+    get: async (n, k) => s(n).get(k),
+    put: async (n, k, v) => { s(n).set(k, v); },
+    del: async (n, k) => { s(n).delete(k); },
+    getAll: async (n) => [...s(n).values()],
+  };
+}
+// appDataFolder falso: { id: texto }.
+function fakeAppData(initial = null) {
+  const files = new Map();
+  if (initial !== null) files.set('bk1', initial);
+  const writes = [];
+  return {
+    files,
+    writes,
+    findAppData: async () => (files.size ? { id: [...files.keys()][0] } : null),
+    readAppData: async (id) => files.get(id),
+    writeAppData: async (name, text, id) => {
+      assert.equal(name, BACKUP_FILE);
+      const fid = id ?? `novo${writes.length}`;
+      files.set(fid, text);
+      writes.push({ id: fid, text });
+      return fid;
+    },
+  };
+}
+function setupBackup({ backup = null, library = ['a', 'b', 'c'] } = {}) {
+  const db = fullDb();
+  for (const id of library) db.stores.set('tracks', (db.stores.get('tracks') ?? new Map()).set(id, { id }));
+  const drive = fakeAppData(backup === null ? null : JSON.stringify(backup));
+  let bk;
+  const store = createPlaylists({ db, onChange: () => bk.changed() });
+  const restored = [];
+  bk = createPlaylistBackup({
+    store, drive, db, delayMs: 0,
+    libraryIds: async () => new Set((db.stores.get('tracks') ?? new Map()).keys()),
+    onRestored: (r) => restored.push(r),
+  });
+  return { db, drive, store, bk, restored };
+}
+const settle = () => new Promise((r) => setTimeout(r, 20));
+const saved = (drive) => JSON.parse([...drive.files.values()].at(-1));
+
+test('backup: formato version 1, só com os campos da playlist', () => {
+  const b = toBackup([{ ...newPlaylist('A', 'p1', 5), extra: 'x' }], 9);
+  assert.deepEqual(b, { version: 1, savedAt: 9, playlists: [{ id: 'p1', name: 'A', trackIds: [], createdAt: 5, updatedAt: 5 }] });
+  assert.equal(fromBackup({ version: 2, playlists: [] }), null);
+  assert.deepEqual(fromBackup(JSON.parse(JSON.stringify(b))).map((p) => p.id), ['p1']);
+});
+
+test('instalação nova: restaura do Drive, tira faixa que não existe mais e avisa', async () => {
+  const backup = toBackup([{ ...newPlaylist('Treino', 'p1', 1), trackIds: ['a', 'sumiu', 'b'] }, { ...newPlaylist('Vazia', 'p2', 1) }]);
+  const { store, bk, restored, drive } = setupBackup({ backup });
+  await bk.sync({ canRestore: true });
+  assert.deepEqual(store.get('p1').trackIds, ['a', 'b']);
+  assert.ok(store.get('p2'));
+  assert.deepEqual(restored, [{ playlists: 2, droppedTracks: 1 }]);
+  await settle();
+  // depois de restaurar, grava a versão limpa (sem a faixa que sumiu) no mesmo arquivo
+  assert.deepEqual(saved(drive).playlists.find((p) => p.id === 'p1').trackIds, ['a', 'b']);
+  assert.equal(drive.writes.at(-1).id, 'bk1');
+});
+
+test('segurança: antes de conferir o backup, nenhuma gravação (nem com mudanças)', async () => {
+  const backup = toBackup([{ ...newPlaylist('Antiga', 'p1', 1), trackIds: ['a'] }]);
+  const { store, bk, drive } = setupBackup({ backup });
+  await store.create('Nova antes do login');
+  await settle(); // o debounce rodou sync() sem canRestore
+  assert.equal(drive.writes.length, 0);
+  await bk.sync({ canRestore: true });
+  await settle();
+  const names = saved(drive).playlists.map((p) => p.name).sort();
+  assert.deepEqual(names, ['Antiga', 'Nova antes do login']); // juntou, não perdeu nenhuma
+});
+
+test('biblioteca vazia: não restaura (tudo pareceria faixa sumida) e não grava', async () => {
+  const backup = toBackup([{ ...newPlaylist('A', 'p1', 1), trackIds: ['a'] }]);
+  const { store, bk, drive } = setupBackup({ backup, library: [] });
+  await bk.sync({ canRestore: true });
+  assert.equal(store.list().length, 0);
+  assert.equal(drive.writes.length, 0);
+});
+
+test('depois de conferido: cada mudança grava; sem mudança não grava; apagar tudo grava lista vazia', async () => {
+  const { store, bk, drive } = setupBackup();
+  await bk.sync({ canRestore: true }); // sem backup no Drive
+  const pl = await store.create('A');
+  await settle();
+  assert.equal(drive.writes.length, 1);
+  await bk.sync();
+  assert.equal(drive.writes.length, 1); // nada pendente
+  await store.add(pl.id, ['a']);
+  await settle();
+  assert.equal(drive.writes.length, 2);
+  assert.equal(drive.writes[1].id, drive.writes[0].id); // mesmo arquivo
+  await store.remove(pl.id);
+  await settle();
+  assert.deepEqual(saved(drive).playlists, []);
+  // reinstalar de novo não ressuscita a apagada: o app já conferiu nesta instalação
+  await bk.sync({ canRestore: true });
+  assert.equal(store.list().length, 0);
+});
+
+test('backup corrompido no Drive: confere, ignora e grava o que há aqui', async () => {
+  const { store, bk, drive } = setupBackup();
+  drive.files.set('bk1', '{quebrado');
+  await bk.sync({ canRestore: true });
+  await store.create('Local');
+  await settle();
+  assert.deepEqual(saved(drive).playlists.map((p) => p.name), ['Local']);
+});
+
+test('sem internet ao gravar: fica pendente e grava na próxima rodada', async () => {
+  const { store, bk, drive } = setupBackup();
+  await bk.sync({ canRestore: true });
+  const real = drive.writeAppData;
+  drive.writeAppData = async () => { throw new TypeError('Load failed'); };
+  await store.create('A');
+  await settle();
+  assert.equal(drive.writes.length, 0);
+  drive.writeAppData = real;
+  await bk.sync();
+  assert.deepEqual(saved(drive).playlists.map((p) => p.name), ['A']);
 });

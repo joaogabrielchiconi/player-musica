@@ -94,3 +94,63 @@ test('isAudio reconhece por mimeType ou extensão', () => {
   assert.ok(!isAudio({ name: 'x.mp3', mimeType: FOLDER }));
   assert.ok(!isAudio({ name: 'capa.jpg', mimeType: 'image/jpeg' }));
 });
+
+// ---- appDataFolder (T12) ----
+function appDataDrive(existing = []) {
+  const calls = [];
+  const fetch = async (url, init = {}) => {
+    calls.push({ url, method: init.method ?? 'GET', body: init.body, headers: init.headers });
+    const u = new URL(url);
+    if (u.pathname.endsWith('/drive/v3/files') && (init.method ?? 'GET') === 'GET') return json({ files: existing });
+    if (u.pathname.startsWith('/upload/') && init.method === 'POST') return json({ id: 'novo1' });
+    if (u.pathname.startsWith('/upload/') && init.method === 'PATCH') return json({ id: u.pathname.split('/').pop() });
+    if (u.searchParams.get('alt') === 'media') return new Response('{"version":1}');
+    return json({}, 404);
+  };
+  return { fetch, calls };
+}
+
+test('appData: procura só no appDataFolder e lê o conteúdo', async () => {
+  const { fetch, calls } = appDataDrive([{ id: 'bk1', name: 'playlists.json' }]);
+  const drive = createDrive({ getToken: () => 't', fetch });
+  const f = await drive.findAppData('playlists.json');
+  assert.equal(f.id, 'bk1');
+  assert.equal(new URL(calls[0].url).searchParams.get('spaces'), 'appDataFolder');
+  assert.equal(await drive.readAppData('bk1'), '{"version":1}');
+});
+
+test('appData: criar vai para o appDataFolder; atualizar só um ID que veio de lá', async () => {
+  const { fetch, calls } = appDataDrive([{ id: 'bk1', name: 'playlists.json' }]);
+  const drive = createDrive({ getToken: () => 't', fetch });
+
+  const id = await drive.writeAppData('playlists.json', '{"a":1}');
+  assert.equal(id, 'novo1');
+  const post = calls.at(-1);
+  assert.equal(post.method, 'POST');
+  assert.match(post.url, /\/upload\/drive\/v3\/files\?uploadType=multipart/);
+  assert.match(post.body, /"parents":\["appDataFolder"\]/);
+
+  // ID que não veio do appDataFolder (ex.: uma música): recusado sem chamar a rede.
+  const before = calls.length;
+  await assert.rejects(drive.writeAppData('playlists.json', '{}', 'faixa123'), /recusada/);
+  assert.equal(calls.length, before);
+
+  await drive.findAppData('playlists.json');
+  assert.equal(await drive.writeAppData('playlists.json', '{"b":2}', 'bk1'), 'bk1');
+  const patch = calls.at(-1);
+  assert.equal(patch.method, 'PATCH');
+  assert.match(patch.url, /\/upload\/drive\/v3\/files\/bk1\?uploadType=media/);
+  assert.equal(patch.body, '{"b":2}');
+  // o que este app criou também pode ser atualizado
+  assert.equal(await drive.writeAppData('playlists.json', '{}', 'novo1'), 'novo1');
+});
+
+test('nenhuma escrita fora das funções de appData (conferência no código)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../js/drive.js', import.meta.url), 'utf8');
+  const writes = [...src.matchAll(/method: '(POST|PATCH|PUT|DELETE)'/g)].map((m) => m.index);
+  const start = src.indexOf('async function writeAppData');
+  const end = src.indexOf('return { request', start);
+  assert.equal(writes.length, 2);
+  for (const i of writes) assert.ok(i > start && i < end, 'escrita fora de writeAppData');
+});
