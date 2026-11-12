@@ -43,24 +43,26 @@ Pronto, em toda tarefa, significa:
 Também mede o tempo entre o toque e o início do som.
 
 **Critérios de aceite:**
-- [ ] No app instalado, o login funciona por pelo menos um dos fluxos, e o fluxo que funcionou fica anotado aqui.
-- [ ] As 3 faixas tocam até o fim com a tela bloqueada, e play/pause/próxima/anterior funcionam na tela de bloqueio, com título.
-- [ ] O tempo até começar a tocar no 4G está anotado aqui.
+- [x] No app instalado, o login funciona por pelo menos um dos fluxos, e o fluxo que funcionou fica anotado aqui.
+- [x] As 3 faixas tocam até o fim com a tela bloqueada, e play/pause/próxima/anterior funcionam na tela de bloqueio, com título.
+- [x] O tempo até começar a tocar no 4G está anotado aqui.
 
 **Verificação:**
-- [ ] Manual: instalar na Tela de Início, bloquear a tela e ouvir as 3 faixas. Repetir no 4G.
+- [x] Manual: instalar na Tela de Início, bloquear a tela e ouvir as 3 faixas. Repetir no 4G.
 
 **Depende de:** T0 · **Arquivos:** `proto/index.html`, `proto/proto.js`, `manifest.webmanifest`, `icons/icon-180.png` · **Tamanho:** M
 
 **Resultados (12/11/2026, app instalado no iPhone):**
 - **Tela bloqueada:** a v1 trocava de faixa sem som. A v2 funcionou com `navigator.audioSession.type = 'playback'` e dois elementos `<audio>` (a próxima faixa começa cerca de 1 s antes do fim da atual). **As duas medidas são obrigatórias no app final.**
-- **Tela de bloqueio:** mostrava ±10 s. A v3 tira os controles nativos e não registra `seekbackward`/`seekforward`; ainda não foi testada.
-- **Tempo até tocar:** faixa pré-carregada 0,0 s. Faixa de 111 MB baixou em 11,3 s no Wi-Fi. O 4G ainda não foi medido.
+- **Tela de bloqueio:** mostrava ±10 s. Desde a v3, mostra ⏮ ⏭: sem os controles nativos do `<audio>`, sem `seekbackward`/`seekforward`, e com `previoustrack`/`nexttrack` registrados de novo a cada faixa. Confirmado na v4.
+- **Anterior/próxima:** funcionam na v4. Ela guarda as 3 últimas faixas na memória e mostra "Carregando…" enquanto baixa.
+- **Tempo até tocar:** faixa pré-carregada 0,0 s. Faixa de 111 MB baixou em 11,3 s no Wi-Fi. No 4G e no Wi-Fi, o usuário confirmou que funciona bem (sem medida exata).
+- **Versão aprovada:** `proto/` na v4 (commit `cda528f`). É a referência para o `player.js` final.
 - **Fluxo de login:** o popup funcionou no app instalado. O redirecionamento não foi testado.
 - **Ícone ▶/⏸ da tela de bloqueio:** fica ▶ mesmo tocando. O usuário decidiu deixar assim. As tentativas v5–v7 quebraram a troca automática e foram revertidas para a v4.
 
 ### Checkpoint: Go/no-go
-- [ ] Os critérios 2 e 3 da spec passam no app instalado.
+- [x] Os critérios 2 e 3 da spec passam no app instalado (o ícone ▶/⏸ é uma exceção aceita).
 - [ ] Você decide se seguimos com o PWA. Se não, reavaliamos app nativo ou VLC antes de qualquer outra tarefa.
 
 ---

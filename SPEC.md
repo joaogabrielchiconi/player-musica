@@ -55,7 +55,7 @@ Ouvir a biblioteca pessoal de músicas guardada no Google Drive sem pagar stream
   - `https://www.googleapis.com/auth/drive.readonly` para ler a pasta.
   - `https://www.googleapis.com/auth/drive.appdata` para o arquivo de backup, que fica numa pasta escondida e exclusiva do app.
 - O token de acesso dura cerca de 1 hora. O app tenta renovar sem interação. Se não conseguir, mostra o botão "Entrar com Google". Tocar o que já foi baixado nunca exige login.
-- O fluxo usado no app instalado (popup ou redirecionamento) é decidido no protótipo, porque popups em PWA de Tela de Início no iOS podem falhar.
+- Fluxo de login: **popup**, que foi validado no protótipo com o app instalado.
 - O Client ID fica em `js/config.js`. Ele é público por natureza e não é segredo. O app não tem client secret.
 
 ### Drive (`drive`)
@@ -67,12 +67,18 @@ Ouvir a biblioteca pessoal de músicas guardada no Google Drive sem pagar stream
 
 ### Reprodução (`player`)
 
-- Um único elemento `<audio>` toca sempre um Blob (via `URL.createObjectURL`). O caminho é o mesmo para as duas origens:
+- O player sempre toca um Blob (via `URL.createObjectURL`). O caminho é o mesmo para as duas origens:
   - Baixada: o Blob vem do IndexedDB.
   - Pela internet: o arquivo inteiro é baixado para a memória e não é salvo.
-- Enquanto uma faixa toca, a próxima da fila é pré-carregada na memória, para a troca funcionar com a tela bloqueada.
-- `shortcut: o arquivo inteiro baixa antes de começar a tocar (cerca de 10 MB, 2 a 4 s no 4G). Upgrade: service worker repassando o Range para streaming de verdade, se o início ficar lento demais.`
-- Media Session API: título, artista, álbum e capa, mais as ações `play`, `pause`, `previoustrack`, `nexttrack` e `seekto`.
+- **Obrigatório (validado no protótipo v4, commit `cda528f`; não mudar sem novo teste no iPhone):**
+  - `navigator.audioSession.type = 'playback'` antes de cada `play()`. Sem isso, a faixa seguinte toca sem som com a tela bloqueada.
+  - **Dois elementos `<audio>`.** A próxima faixa fica pronta no elemento parado e começa cerca de 1 s antes do fim da atual. A anterior só é pausada depois que a nova já está tocando.
+  - A próxima faixa é pré-carregada na memória enquanto a atual toca. As 3 últimas faixas ficam em cache na memória.
+  - **Sem os controles nativos do `<audio>`.** A interface tem botões próprios.
+  - Media Session com `play`, `pause`, `previoustrack`, `nexttrack` e `seekto`, registrados de novo a cada faixa. `seekbackward` e `seekforward` ficam `null`; assim a tela de bloqueio mostra ⏮ ⏭ em vez de ±10 s.
+- **Limitação aceita:** o ícone ▶/⏸ da tela de bloqueio fica em ▶ mesmo tocando. As tentativas de correção quebraram a troca automática.
+- `shortcut: o arquivo inteiro baixa antes de começar a tocar. Funciona bem no 4G com faixas comuns; arquivos muito grandes (ex.: 111 MB) demoram. Upgrade: streaming com Range, se isso incomodar.`
+- Media Session também com título, artista, álbum e capa.
 - Estado salvo no `db` (fila, índice, posição a cada ~5 s, aleatório/repetir), e restaurado ao abrir o app.
 
 ### Tags (`tags`)
@@ -219,7 +225,6 @@ export function groupByAlbum(tracks) {
 
 ## Perguntas em aberto
 
-1. **Fluxo de login no app instalado** (popup ou redirecionamento): é decidido no protótipo, porque depende do comportamento do iOS 26.
-2. **Demora para começar a tocar pela internet** (baixar o arquivo inteiro antes): é medida no protótipo; se passar de ~5 s no 4G, o streaming com Range entra no plano.
-3. **Biblioteca de tags:** é escolhida e aprovada na tarefa de `tags`.
-4. **Nome do usuário e do repositório no GitHub:** são definidos quando você fizer o `gh auth login`.
+1. **Biblioteca de tags:** é escolhida e aprovada na tarefa de `tags`.
+
+As outras perguntas foram respondidas: login por popup; tempo até tocar aceitável no 4G; repositório `joaogabrielchiconi/player-musica`.
