@@ -22,8 +22,8 @@ Pronto, em toda tarefa, significa:
 4. Você: subir pelo menos 3 MP3s (de um mesmo álbum) para `Músicas`.
 
 **Critérios de aceite:**
-- [ ] `gh auth status` mostra que está logado, e o Pages responde em `https://<usuario>.github.io/player-musica/`.
-- [ ] O Client ID está em `js/config.js`, e você está como usuário de teste na tela de consentimento.
+- [x] `gh auth status` mostra que está logado, e o Pages responde em `https://joaogabrielchiconi.github.io/player-musica/`.
+- [x] O Client ID está em `js/config.js`, e você está como usuário de teste na tela de consentimento.
 - [ ] A pasta `Músicas` tem pelo menos 3 faixas.
 
 **Verificação:**
