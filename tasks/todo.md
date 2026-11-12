@@ -367,18 +367,18 @@ Respeitar a área segura do iPhone (notch e barra inferior).
 - Percorrer os 10 critérios de sucesso da spec.
 
 **Critérios de aceite:**
-- [ ] O VoiceOver lê todos os controles do player.
-- [ ] A revisão de segurança não deixa nenhum achado alto sem correção.
-- [ ] Os 10 critérios da spec foram marcados como verificados no iPhone.
+- [x] O VoiceOver lê todos os controles do player.
+- [x] A revisão de segurança não deixa nenhum achado alto sem correção.
+- [x] Os 10 critérios da spec foram marcados como verificados no iPhone.
 
 **Verificação:**
-- [ ] `node --test`
-- [ ] Manual: o checklist final abaixo.
+- [x] `node --test`
+- [x] Manual: o checklist final abaixo.
 
-**Feito (12/11/2026, aguardando teste no iPhone):** `manifest.webmanifest` e `icons/` (fita K7; o app principal não tinha manifesto, só o protótipo). Rótulos de acessibilidade conferidos em todos os botões só de ícone. Revisão de segurança (leitura do código, sem achado alto): escopos só `drive.readonly` + `drive.appdata`; escrita no Drive só no appDataFolder e só em arquivo cujo ID veio de lá; nenhum `innerHTML`/`eval` (texto de tags e nomes entra por `textContent`); `state` do OAuth conferido; `postMessage` preso à própria origem; `sanitize()` valida o backup. Baixo, aceito: token de 1 h no `localStorage` (fluxo implícito, sem refresh token) e sem CSP (adicionar poderia quebrar o login do Google).
+**Aprovado no iPhone (12/11/2026).** Feito: `manifest.webmanifest` e `icons/` (fita K7; o app principal não tinha manifesto, só o protótipo). Rótulos de acessibilidade conferidos em todos os botões só de ícone. Revisão de segurança (leitura do código, sem achado alto): escopos só `drive.readonly` + `drive.appdata`; escrita no Drive só no appDataFolder e só em arquivo cujo ID veio de lá; nenhum `innerHTML`/`eval` (texto de tags e nomes entra por `textContent`); `state` do OAuth conferido; `postMessage` preso à própria origem; `sanitize()` valida o backup. Baixo, aceito: token de 1 h no `localStorage` (fluxo implícito, sem refresh token) e sem CSP (adicionar poderia quebrar o login do Google).
 
 **Depende de:** T13 · **Arquivos:** `manifest.webmanifest`, `icons/*`, `index.html`, `css/app.css` · **Tamanho:** S
 
 ### Checkpoint final
-- [ ] 1 Instalação · 2 Login · 3 Tela bloqueada · 4 Biblioteca · 5 Offline
-- [ ] 6 Espaço · 7 Backup · 8 Retomar · 9 Drive intacto · 10 Testes
+- [x] 1 Instalação · 2 Login · 3 Tela bloqueada · 4 Biblioteca · 5 Offline
+- [x] 6 Espaço · 7 Backup · 8 Retomar · 9 Drive intacto · 10 Testes
