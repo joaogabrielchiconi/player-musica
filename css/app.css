@@ -106,9 +106,6 @@ main { padding-bottom: calc(var(--mini-h) + var(--tabs-h) + env(safe-area-inset-
 
 /* ---- blocos soltos ---- */
 .actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 20px 12px; }
-.album-head { display: flex; gap: 14px; align-items: flex-start; padding: 8px 20px 4px; }
-.album-head .meta { flex: 1; padding-top: 2px; }
-.album-head .actions { padding: 8px 0 0; }
 .cover { width: 112px; height: 112px; flex: none; display: grid; place-items: center; border: 1px solid var(--edge); border-radius: 10px; background: var(--surface); color: var(--edge); overflow: hidden; }
 .cover .ic { width: 44px; height: 44px; }
 .cover img { width: 100%; height: 100%; object-fit: cover; }

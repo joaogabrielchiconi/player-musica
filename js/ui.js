@@ -55,7 +55,7 @@ function emptyState(iconName, heading, text) {
 export function createLibraryUI({ root, title, countEl, back, search, tabs, getArt, onPlay, onlyDownloaded, isDownloaded, isAvailable, downloads, playlists, toast }) {
   let tracks = [];
   let tab = 'songs';
-  let detail = null; // { kind: 'artist' | 'album' | 'playlist', group } (playlist: group = { id })
+  let detail = null; // { kind: 'artist' | 'playlist', group } (playlist: group = { id })
   let editing = false; // detalhe de playlist em modo de edição (▲ ▼ ✕)
   let nowId = null; // faixa tocando agora (para marcar a linha)
   let nowPlaying = false;
@@ -251,23 +251,10 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
   }
 
   function openDetail(kind, group) {
-    // O álbum aberto a partir de um artista lembra de onde veio, para o "voltar".
-    detail = { kind, group, from: detail?.kind === 'artist' ? detail : null };
+    detail = { kind, group };
     editing = false;
     window.scrollTo(0, 0);
     render();
-  }
-
-  async function renderAlbum(g) {
-    setCount(g.tracks.length);
-    const cover = el('div', { className: 'cover' }, icon('cassette'));
-    root.append(
-      el('div', { className: 'album-head' }, cover,
-        el('div', { className: 'meta' }, el('span', { className: 'title', textContent: g.artist }), el('span', { className: 'sub', textContent: count(g.tracks.length) }),
-          el('div', { className: 'actions' }, bulkButton(g.tracks), addAllButton(g.tracks)))),
-      trackList(g.tracks, { showAlbum: false, numbered: true }));
-    const url = g.hasArt ? await artUrl(g.key) : null;
-    if (url) cover.replaceChildren(el('img', { src: url, alt: `Capa de ${g.album}` }));
   }
 
   // Desenha a tela atual. Sempre termina marcando a linha que está tocando.
@@ -282,15 +269,11 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
     onlyDownloaded.parentElement.hidden = search.hidden; // o filtro só vale para as listas de músicas
 
     if (detail?.kind === 'playlist') return renderPlaylist(detail.group.id);
-    if (detail?.kind === 'album') {
-      title.textContent = detail.group.album;
-      return renderAlbum(detail.group);
-    }
     if (detail?.kind === 'artist') {
       title.textContent = detail.group.artist;
-      setCount(detail.group.albums.length);
+      setCount(detail.group.tracks.length);
       return root.append(el('div', { className: 'actions' }, bulkButton(detail.group.tracks), addAllButton(detail.group.tracks)),
-        groupList(detail.group.albums, (a) => ({ title: a.album, sub: count(a.tracks.length) }), (a) => openDetail('album', a)));
+        trackList(detail.group.tracks));
     }
     title.textContent = TAB_TITLE[tab];
     if (tab === 'playlists') return renderPlaylistList();
@@ -342,7 +325,7 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
   }
 
   for (const b of tabs) b.onclick = () => { tab = b.dataset.tab; detail = null; editing = false; render(); };
-  back.onclick = () => { detail = detail?.from ?? null; editing = false; render(); };
+  back.onclick = () => { detail = null; editing = false; render(); };
   search.oninput = render;
   onlyDownloaded.onchange = () => { detail = null; editing = false; render(); };
 
