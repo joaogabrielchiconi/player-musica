@@ -5,7 +5,7 @@
 // falha se ele estiver velho). O navegador vê o sw.js diferente, baixa TODOS os arquivos para um cache
 // novo e só então troca (tudo ou nada: nunca mistura arquivos de versões diferentes).
 // A troca vale a partir da abertura seguinte do app.
-const VERSION = 'f40e48d23dd1';
+const VERSION = 'fad49aa733b8';
 const CACHE = `app-${VERSION}`;
 const ASSETS = [
   './',
@@ -23,7 +23,11 @@ const ASSETS = [
   'js/queue.js',
   'js/tags.js',
   'js/ui.js',
-  'proto/icon-180.png',
+  'manifest.webmanifest',
+  'icons/icon-180.png',
+  'icons/icon-192.png',
+  'icons/icon-512.png',
+  'icons/icon-maskable-512.png',
 ];
 // No PC (localhost) a rede vem primeiro, para o desenvolvimento não ficar preso em arquivo velho.
 const DEV = self.location.hostname === 'localhost';
