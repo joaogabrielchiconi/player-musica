@@ -17,8 +17,11 @@ const el = (tag, props = {}, ...children) => {
  * @param {NodeListOf<HTMLButtonElement>} o.tabs  botões com data-tab
  * @param {(store: string, key: string) => Promise<any>} o.getArt
  * @param {(track: object, list: object[]) => void} o.onPlay
+ * @param {HTMLInputElement} o.onlyDownloaded  filtro "Só baixadas"
+ * @param {(track: object) => boolean} o.isDownloaded
+ * @param {(track: object) => boolean} o.isAvailable  toca agora (com internet, ou baixada)
  */
-export function createLibraryUI({ root, title, back, search, tabs, getArt, onPlay }) {
+export function createLibraryUI({ root, title, back, search, tabs, getArt, onPlay, onlyDownloaded, isDownloaded, isAvailable }) {
   let tracks = [];
   let tab = 'songs';
   let detail = null; // { kind: 'artist' | 'album', group }
@@ -41,6 +44,7 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
         el('span', { className: 'title', textContent: numbered && t.trackNo ? `${t.trackNo}. ${t.title}` : t.title }),
         el('span', { className: 'sub', textContent: sub }));
       if (t.removedFromDrive) li.append(el('span', { className: 'sub removed', textContent: 'removida do Drive' }));
+      if (!isAvailable(t)) { li.classList.add('off'); li.ariaDisabled = 'true'; } // sem internet e não baixada
       li.onclick = () => onPlay(t, list);
       frag.append(li);
     }
@@ -97,8 +101,10 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
         (a) => ({ title: a.album, sub: count(a.tracks.length) }), (a) => openDetail('album', a)));
     }
 
-    const found = searchTracks(tracks, q);
+    const pool = onlyDownloaded.checked ? tracks.filter(isDownloaded) : tracks;
+    const found = searchTracks(pool, q);
     if (!tracks.length) return; // a mensagem de "entre/atualize" fica no status
+    if (!pool.length) return root.append(el('p', { className: 'status', textContent: 'Nenhuma música baixada ainda.' }));
     if (!found.length) return root.append(el('p', { className: 'status', textContent: `Nada encontrado para "${q}".` }));
 
     if (tab === 'songs') {
@@ -118,8 +124,10 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
   for (const b of tabs) b.onclick = () => { tab = b.dataset.tab; detail = null; render(); };
   back.onclick = () => { detail = detail?.from ?? null; render(); };
   search.oninput = render;
+  onlyDownloaded.onchange = () => { detail = null; render(); };
 
   return {
+    refresh: render, // a internet caiu ou voltou: redesenha sem sair da tela atual
     setTracks(list) {
       tracks = list;
       // Depois de sincronizar, um detalhe aberto pode ter mudado: volta para a aba.
@@ -138,8 +146,9 @@ const REPEAT_LABEL = { off: 'Repetir: desligado', all: 'Repetir: tudo', one: 'Re
  * @param {ReturnType<import('./player.js').createPlayer>} o.player
  * @param {(track: object) => Promise<string|null>} o.artUrl
  * @param {(id: string) => HTMLElement} o.$
+ * @param {(track: object) => boolean} o.canPlay  false: não toca (e quem chamou já avisou)
  */
-export function createPlayerUI({ player, artUrl, $ }) {
+export function createPlayerUI({ player, artUrl, $, canPlay }) {
   let shownId = null; // faixa desenhada na capa/títulos
   let shownOrder = null; // fila desenhada na lista (order e items de q)
   let shownItems = null;
@@ -169,7 +178,7 @@ export function createPlayerUI({ player, artUrl, $ }) {
       const li = el('li', { className: 'row', tabIndex: 0 },
         el('span', { className: 'title', textContent: t.title }),
         el('span', { className: 'sub', textContent: t.artist }));
-      li.onclick = () => player.playAt(pos);
+      li.onclick = () => { if (canPlay(t)) player.playAt(pos); };
       frag.append(li);
     });
     ol.append(frag);

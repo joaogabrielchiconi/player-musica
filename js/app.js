@@ -1,4 +1,4 @@
-// Inicialização do app: login, sincronização da biblioteca, abas, player e retomada (T5 a T8).
+// Inicialização do app: login, sincronização da biblioteca, abas, player, retomada e offline (T5 a T9).
 import { handleAuthReturn, signIn, getToken, clearToken } from './auth.js';
 import { createDrive } from './drive.js';
 import * as db from './db.js';
@@ -54,19 +54,51 @@ async function restorePlayer() {
   if (r) player.restore(r.q, r.time, r.duration);
 }
 
+// ---- internet (T9): navigator.onLine e também a falha de uma chamada ----
+let online = navigator.onLine;
+let downloaded = new Set(); // IDs no store audio (os downloads chegam na T10)
+const isNetworkError = (err) => err instanceof TypeError; // fetch sem rede rejeita com TypeError
+function setOnline(value) {
+  if (value === online) return;
+  online = value;
+  setStatus(online ? '' : 'Sem internet: só as músicas baixadas tocam.');
+  ui.refresh();
+}
+addEventListener('online', () => setOnline(true));
+addEventListener('offline', () => setOnline(false));
+const isAvailable = (t) => online || downloaded.has(t.id);
+
+let toastTimer;
+function toast(text) {
+  $('toast').textContent = text;
+  $('toast').hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { $('toast').hidden = true; }, 2500);
+}
+const OFFLINE_MSG = 'Sem internet: esta música não foi baixada.';
+function canPlay(t) {
+  if (isAvailable(t)) return true;
+  toast(OFFLINE_MSG);
+  return false;
+}
+
 let updatePlayerUI = () => {};
 const player = createPlayer({
   audio: $('audio'),
-  download: (id) => drive.download(id),
+  download: (id) => drive.download(id).then(
+    (blob) => { setOnline(true); return blob; },
+    (err) => { if (isNetworkError(err)) setOnline(false); throw err; },
+  ),
   artUrl,
   fallbackArt: new URL('../proto/icon-180.png', import.meta.url).href,
   onUpdate: (s) => { updatePlayerUI(s); saveState(s); },
   onError: (err) => {
+    if (isNetworkError(err)) return toast(OFFLINE_MSG);
     setStatus(err.name === 'AuthError' ? 'O acesso ao Google venceu. Toque em "Entrar com Google".' : `Não deu para tocar: ${err.message}`);
     refreshButtons();
   },
 });
-updatePlayerUI = createPlayerUI({ player, artUrl, $ });
+updatePlayerUI = createPlayerUI({ player, artUrl, $, canPlay });
 
 const ui = createLibraryUI({
   root: $('library'),
@@ -75,7 +107,10 @@ const ui = createLibraryUI({
   search: $('search'),
   tabs: document.querySelectorAll('[data-tab]'),
   getArt: db.get,
-  onPlay: (t, list) => player.playList(list, list.indexOf(t)),
+  onPlay: (t, list) => { if (canPlay(t)) player.playList(list, list.indexOf(t)); },
+  onlyDownloaded: $('onlyDownloaded'),
+  isDownloaded: (t) => downloaded.has(t.id),
+  isAvailable,
 });
 
 async function render() {
@@ -97,11 +132,13 @@ async function sync() {
         if (p.phase === 'tags' && p.total) setStatus(`Lendo músicas novas: ${p.done} de ${p.total}`);
       },
     });
+    setOnline(true);
     const n = await render();
     const changes = [r.added && `${r.added} nova(s)`, r.changed && `${r.changed} alterada(s)`, r.removed && `${r.removed} removida(s)`].filter(Boolean);
     setStatus(`${n} música(s)${changes.length ? ` · ${changes.join(', ')}` : ' · nada mudou'}`);
   } catch (err) {
-    await render();
+    const n = await render();
+    if (isNetworkError(err)) { setOnline(false); return setStatus(`${n} música(s) · sem internet`); }
     setStatus(err.name === 'AuthError' ? 'O acesso ao Google venceu. Toque em "Entrar com Google".' : `Não deu para atualizar: ${err.message}`);
   } finally {
     syncing = false;
@@ -115,8 +152,10 @@ $('signin').onclick = () => {
 $('sync').onclick = sync;
 
 async function start() {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   db.persist().catch(() => {});
   refreshButtons();
+  downloaded = new Set(await db.keys('audio').catch(() => []));
   await restorePlayer().catch(() => {}); // estado ilegível: abre com o player vazio
   const n = await render();
   if (!getToken()) return setStatus(n ? `${n} música(s) · entre para atualizar` : 'Entre com o Google para carregar suas músicas.');

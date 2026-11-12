@@ -1,6 +1,7 @@
 /* Visual provisório: o design definitivo sai da T13 (impeccable). */
 :root { --bg: #111; --fg: #eee; --muted: #999; --line: #2a2a2a; --accent: #f5a524; }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; } /* senão display: flex de .mini vence o hidden */
 body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.4 -apple-system, system-ui, sans-serif;
        padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 16px); }
 h1 { font-size: 28px; margin: 0 0 8px; }
@@ -50,3 +51,8 @@ body.full-open { overflow: hidden; }
 .controls [aria-pressed="true"] { color: var(--accent); }
 .queue-head { font-size: 16px; margin: 16px 0 4px; }
 .queue [aria-current] .title { color: var(--accent); }
+.filter { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; color: var(--muted); font-size: 14px; margin-bottom: 4px; }
+.filter input { width: 20px; height: 20px; accent-color: var(--accent); }
+.tracks .row.off { opacity: .4; } /* sem internet e não baixada */
+.toast { position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 130px); z-index: 20; margin: 0;
+         padding: 10px 14px; border-radius: 10px; background: #2b2b2b; color: var(--fg); font-size: 14px; text-align: center; }
