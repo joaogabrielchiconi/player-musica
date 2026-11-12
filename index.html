@@ -20,9 +20,12 @@
   </header>
   <main id="library"></main>
   <footer class="bottom">
-    <div class="now" id="now" hidden>
-      <span id="nowTitle" class="now-title"></span>
-      <button id="nowToggle" aria-label="Pausar">⏸</button>
+    <div class="mini" id="mini" hidden>
+      <button id="miniOpen" class="mini-info" aria-label="Abrir o player">
+        <span id="miniTitle" class="title"></span><span id="miniSub" class="sub"></span>
+      </button>
+      <button id="miniToggle" aria-label="Pausar">⏸︎</button>
+      <button id="miniNext" aria-label="Próxima">⏭︎</button>
     </div>
     <nav class="tabs" role="tablist">
       <button role="tab" data-tab="songs" aria-selected="true">Músicas</button>
@@ -30,6 +33,23 @@
       <button role="tab" data-tab="albums" aria-selected="false">Álbuns</button>
     </nav>
   </footer>
+  <section id="full" class="full" hidden aria-label="Tocando agora">
+    <button id="fullClose" class="back">⌄ Fechar</button>
+    <div class="full-cover" id="fullCover"></div>
+    <p id="fullTitle" class="full-title"></p>
+    <p id="fullSub" class="sub"></p>
+    <input id="seek" class="seek" type="range" min="0" max="0" step="1" value="0" aria-label="Posição na música">
+    <div class="times"><span id="tNow">0:00</span><span id="tEnd">0:00</span></div>
+    <div class="controls">
+      <button id="shuffle" aria-pressed="false" aria-label="Aleatório">🔀︎</button>
+      <button id="prev" aria-label="Anterior">⏮︎</button>
+      <button id="toggle" class="big" aria-label="Pausar">⏸︎</button>
+      <button id="next" aria-label="Próxima">⏭︎</button>
+      <button id="repeat" aria-pressed="false" aria-label="Repetir: desligado">🔁︎</button>
+    </div>
+    <h2 class="queue-head">Fila</h2>
+    <ol id="queue" class="tracks queue"></ol>
+  </section>
   <audio id="audio" playsinline preload="auto"></audio>
   <!-- Esta página também é o retorno do login do Google (REDIRECT_URI): app.js trata isso primeiro. -->
   <script type="module" src="js/app.js"></script>

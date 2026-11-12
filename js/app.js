@@ -1,9 +1,10 @@
-// Inicialização do app: login, sincronização da biblioteca e abas (T5, T6).
+// Inicialização do app: login, sincronização da biblioteca, abas e player (T5, T6, T7).
 import { handleAuthReturn, signIn, getToken, clearToken } from './auth.js';
 import { createDrive } from './drive.js';
 import * as db from './db.js';
-import { syncLibrary } from './library.js';
-import { createLibraryUI } from './ui.js';
+import { syncLibrary, albumKey } from './library.js';
+import { createLibraryUI, createPlayerUI } from './ui.js';
+import { createPlayer } from './player.js';
 
 const $ = (id) => document.getElementById(id);
 const drive = createDrive({ getToken, onUnauthorized: () => { clearToken(); return null; } });
@@ -18,30 +19,30 @@ function refreshButtons() {
   $('sync').disabled = syncing;
 }
 
-// shortcut: toca só a faixa tocada, sem fila nem próxima com a tela bloqueada; a T7 troca por js/player.js (receita do protótipo v4).
-const audio = $('audio');
-let playingId = null;
-async function play(t) {
-  if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback';
-  playingId = t.id;
-  $('now').hidden = false;
-  $('nowTitle').textContent = `Carregando: ${t.title}`;
-  try {
-    const blob = await drive.download(t.id);
-    if (playingId !== t.id) return; // tocou em outra enquanto baixava
-    if (audio.src) URL.revokeObjectURL(audio.src);
-    audio.src = URL.createObjectURL(blob);
-    await audio.play();
-    $('nowTitle').textContent = `${t.title} · ${t.artist}`;
-    if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist, album: t.album });
-  } catch (err) {
-    $('nowTitle').textContent = err.name === 'AuthError' ? 'O acesso ao Google venceu. Toque em "Entrar com Google".' : `Não deu para tocar: ${err.message}`;
-    refreshButtons();
+// Capa do álbum como URL (fica na memória enquanto o app está aberto).
+const artUrls = new Map();
+async function artUrl(t) {
+  const key = albumKey(t.artist, t.album);
+  if (!artUrls.has(key)) {
+    const blob = await db.get('art', key);
+    artUrls.set(key, blob ? URL.createObjectURL(blob) : null);
   }
+  return artUrls.get(key);
 }
-$('nowToggle').onclick = () => (audio.paused ? audio.play() : audio.pause());
-audio.onplay = () => { $('nowToggle').textContent = '⏸'; $('nowToggle').ariaLabel = 'Pausar'; };
-audio.onpause = () => { $('nowToggle').textContent = '▶︎'; $('nowToggle').ariaLabel = 'Tocar'; };
+
+let updatePlayerUI = () => {};
+const player = createPlayer({
+  audio: $('audio'),
+  download: (id) => drive.download(id),
+  artUrl,
+  fallbackArt: new URL('../proto/icon-180.png', import.meta.url).href,
+  onUpdate: (s) => updatePlayerUI(s),
+  onError: (err) => {
+    setStatus(err.name === 'AuthError' ? 'O acesso ao Google venceu. Toque em "Entrar com Google".' : `Não deu para tocar: ${err.message}`);
+    refreshButtons();
+  },
+});
+updatePlayerUI = createPlayerUI({ player, artUrl, $ });
 
 const ui = createLibraryUI({
   root: $('library'),
@@ -50,7 +51,7 @@ const ui = createLibraryUI({
   search: $('search'),
   tabs: document.querySelectorAll('[data-tab]'),
   getArt: db.get,
-  onPlay: play,
+  onPlay: (t, list) => player.playList(list, list.indexOf(t)),
 });
 
 async function render() {

@@ -128,3 +128,94 @@ export function createLibraryUI({ root, title, back, search, tabs, getArt, onPla
     },
   };
 }
+
+// ---- mini player e tela cheia (T7) ----
+const fmt = (s) => (Number.isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : '0:00');
+const REPEAT_LABEL = { off: 'Repetir: desligado', all: 'Repetir: tudo', one: 'Repetir: uma' };
+
+/**
+ * @param {object} o
+ * @param {ReturnType<import('./player.js').createPlayer>} o.player
+ * @param {(track: object) => Promise<string|null>} o.artUrl
+ * @param {(id: string) => HTMLElement} o.$
+ */
+export function createPlayerUI({ player, artUrl, $ }) {
+  let shownId = null; // faixa desenhada na capa/títulos
+  let shownOrder = null; // fila desenhada na lista (order e items de q)
+  let shownItems = null;
+  let dragging = false;
+
+  $('miniOpen').onclick = () => { $('full').hidden = false; document.body.classList.add('full-open'); scrollQueue(); };
+  $('fullClose').onclick = () => { $('full').hidden = true; document.body.classList.remove('full-open'); };
+  $('miniToggle').onclick = $('toggle').onclick = () => player.toggle();
+  $('miniNext').onclick = $('next').onclick = () => player.next();
+  $('prev').onclick = () => player.prev();
+  $('shuffle').onclick = () => player.toggleShuffle();
+  $('repeat').onclick = () => player.cycleRepeat();
+  const seek = $('seek');
+  seek.oninput = () => { dragging = true; $('tNow').textContent = fmt(Number(seek.value)); };
+  seek.onchange = () => { player.seek(Number(seek.value)); dragging = false; };
+
+  function scrollQueue() {
+    $('queue').querySelector('[aria-current]')?.scrollIntoView({ block: 'center' });
+  }
+
+  function renderQueue(q) {
+    const ol = $('queue');
+    ol.textContent = '';
+    const frag = document.createDocumentFragment();
+    q.order.forEach((idx, pos) => {
+      const t = q.items[idx];
+      const li = el('li', { className: 'row', tabIndex: 0 },
+        el('span', { className: 'title', textContent: t.title }),
+        el('span', { className: 'sub', textContent: t.artist }));
+      li.onclick = () => player.playAt(pos);
+      frag.append(li);
+    });
+    ol.append(frag);
+  }
+
+  return function update(s) {
+    const t = s.track;
+    $('mini').hidden = !t;
+    if (!t) return;
+    const pauseLabel = s.playing ? 'Pausar' : 'Tocar';
+    for (const b of [$('miniToggle'), $('toggle')]) { b.textContent = s.playing ? '⏸︎' : '▶︎'; b.ariaLabel = pauseLabel; }
+    const sub = s.loading ? 'Carregando…' : `${t.artist} · ${t.album}`;
+    $('miniSub').textContent = sub;
+    $('fullSub').textContent = sub;
+    $('shuffle').ariaPressed = String(s.queue.shuffle);
+    $('repeat').ariaPressed = String(s.queue.repeat !== 'off');
+    $('repeat').ariaLabel = REPEAT_LABEL[s.queue.repeat];
+    $('repeat').textContent = s.queue.repeat === 'one' ? '🔂︎' : '🔁︎';
+    if (!dragging) {
+      seek.max = String(Math.floor(s.duration) || 0);
+      seek.value = String(Math.floor(s.time));
+      $('tNow').textContent = fmt(s.time);
+    }
+    $('tEnd').textContent = fmt(s.duration);
+
+    if (shownOrder !== s.queue.order || shownItems !== s.queue.items) {
+      renderQueue(s.queue);
+      shownOrder = s.queue.order;
+      shownItems = s.queue.items;
+    }
+    const rows = $('queue').children;
+    $('queue').querySelector('[aria-current]')?.removeAttribute('aria-current');
+    rows[s.queue.pos]?.setAttribute('aria-current', 'true');
+
+    if (shownId !== t.id) {
+      shownId = t.id;
+      $('miniTitle').textContent = t.title;
+      $('fullTitle').textContent = t.title;
+      const cover = $('fullCover');
+      cover.textContent = '';
+      if (t.hasArt) {
+        artUrl(t).then((url) => {
+          if (url && shownId === t.id) cover.append(el('img', { src: url, alt: `Capa de ${t.album}` }));
+        });
+      }
+      if (!$('full').hidden) scrollQueue();
+    }
+  };
+}
