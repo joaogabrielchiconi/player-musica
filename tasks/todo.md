@@ -375,6 +375,8 @@ Respeitar a área segura do iPhone (notch e barra inferior).
 - [ ] `node --test`
 - [ ] Manual: o checklist final abaixo.
 
+**Feito (12/11/2026, aguardando teste no iPhone):** `manifest.webmanifest` e `icons/` (fita K7; o app principal não tinha manifesto, só o protótipo). Rótulos de acessibilidade conferidos em todos os botões só de ícone. Revisão de segurança (leitura do código, sem achado alto): escopos só `drive.readonly` + `drive.appdata`; escrita no Drive só no appDataFolder e só em arquivo cujo ID veio de lá; nenhum `innerHTML`/`eval` (texto de tags e nomes entra por `textContent`); `state` do OAuth conferido; `postMessage` preso à própria origem; `sanitize()` valida o backup. Baixo, aceito: token de 1 h no `localStorage` (fluxo implícito, sem refresh token) e sem CSP (adicionar poderia quebrar o login do Google).
+
 **Depende de:** T13 · **Arquivos:** `manifest.webmanifest`, `icons/*`, `index.html`, `css/app.css` · **Tamanho:** S
 
 ### Checkpoint final
