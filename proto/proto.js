@@ -134,7 +134,7 @@ $('list').onclick = async () => {
 };
 
 // ---------- experimentos (v2): som mudo na troca de faixa com a tela bloqueada ----------
-const VERSION = 'v3';
+const VERSION = 'v4';
 // v2 confirmou: as duas opções juntas resolvem o som mudo com a tela bloqueada.
 const OPTS = { optSession: ['opt_session', true], optTwo: ['opt_two', true] };
 const opts = {};
@@ -193,7 +193,7 @@ function fetchBlob(i) {
 function startPrefetch(i) {
   if (i < 0 || i >= tracks.length || prefetch?.index === i) return;
   log(`pré-carregando faixa ${i + 1}`);
-  const promise = fetchBlob(i);
+  const promise = getBlob(i);
   prefetch = { index: i, promise };
   promise.then((blob) => {
     if (!opts.optTwo || prefetch?.index !== i || index !== i - 1) return;
@@ -203,6 +203,24 @@ function startPrefetch(i) {
     prepared = { index: i, el };
     log(`faixa ${i + 1} preparada no 2º elemento`);
   }).catch((err) => { log(`erro no pré-carregamento: ${err.message}`); if (prefetch?.index === i) prefetch = null; });
+}
+
+// Guarda as 3 últimas faixas na memória: "anterior" não precisa baixar de novo (com a tela bloqueada isso parecia travado).
+const blobCache = new Map(); // track id -> blob
+function getBlob(i) {
+  const id = tracks[i].id;
+  if (blobCache.has(id)) return Promise.resolve(blobCache.get(id));
+  return fetchBlob(i).then((blob) => {
+    blobCache.set(id, blob);
+    while (blobCache.size > 3) blobCache.delete(blobCache.keys().next().value);
+    return blob;
+  });
+}
+
+// O iOS deduz o ícone ▶/⏸ da tela de bloqueio pelo último elemento que pausou; com dois elementos, a pausa
+// do anterior fazia o ícone ficar em ▶ com a música tocando. Por isso o estado é informado explicitamente.
+function setPlaybackState(state) {
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = state;
 }
 
 async function playIndex(i, reason) {
@@ -217,7 +235,12 @@ async function playIndex(i, reason) {
     let el;
     if (prepared?.index === i) el = prepared.el;
     else {
-      const blob = await (prefetch?.index === i ? prefetch.promise : fetchBlob(i));
+      const cached = blobCache.has(tracks[i].id);
+      if (!cached) {
+        setMediaSession(tracks[i], 'Carregando…'); // a tela de bloqueio mostra na hora para onde foi
+        log(`baixando faixa ${i + 1} (${mb(tracks[i].size)}) antes de tocar`);
+      }
+      const blob = await (prefetch?.index === i ? prefetch.promise : getBlob(i));
       if (index !== i) return; // usuário pulou para outra faixa enquanto baixava
       el = opts.optTwo ? players[1 - cur] : old;
       setSrc(el, blob);
@@ -229,6 +252,7 @@ async function playIndex(i, reason) {
     cur = players.indexOf(el); // antes do play(), para os eventos do novo elemento contarem como ativos
     await el.play();
     if (el !== old) old.pause(); // só pausa a anterior depois que a nova já está tocando
+    setPlaybackState('playing');
   } catch (err) { log(`erro ao tocar faixa ${i + 1}: ${err.message}`); }
   advancing = false;
 }
@@ -241,8 +265,17 @@ for (const el of players) {
     log(`terminou faixa ${index + 1}`);
     playIndex(index + 1, 'fim da anterior');
   });
-  el.addEventListener('pause', () => { if (el === active() && !el.ended) { log('pausado'); $('playPause').textContent = '▶︎'; } });
-  el.addEventListener('play', () => { if (el === active()) $('playPause').textContent = '⏸'; });
+  el.addEventListener('pause', () => {
+    if (el !== active() || el.ended) return;
+    log('pausado');
+    $('playPause').textContent = '▶︎';
+    setPlaybackState('paused');
+  });
+  el.addEventListener('playing', () => {
+    if (el !== active()) return;
+    $('playPause').textContent = '⏸';
+    setPlaybackState('playing');
+  });
   el.addEventListener('error', () => log(`erro do <audio> ${n}: ${el.error?.code}`));
   el.addEventListener('timeupdate', () => {
     if (el !== active() || !el.duration) return;
@@ -257,19 +290,23 @@ for (const el of players) {
   });
 }
 
-function setMediaSession(t) {
+function setMediaSession(t, artist = 'Protótipo') {
   if (!('mediaSession' in navigator)) return log('Media Session não disponível');
   navigator.mediaSession.metadata = new MediaMetadata({
-    title: t.name.replace(/\.[^.]+$/, ''), artist: 'Protótipo', album: t.path.split('/').slice(-2, -1)[0] || 'Músicas',
+    title: t.name.replace(/\.[^.]+$/, ''), artist, album: t.path.split('/').slice(-2, -1)[0] || 'Músicas',
     artwork: [{ src: new URL('icon-180.png', location.href).href, sizes: '180x180', type: 'image/png' }],
   });
   registerActions(); // de novo a cada faixa: o iOS pode descartar os handlers ao trocar o elemento que toca
 }
 
 const fmt = (s) => (Number.isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : '0:00');
-const next = (why) => playIndex(index + 1, why);
+function next(why) {
+  log(`${why} (pressionado na faixa ${index + 1} de ${tracks.length})`);
+  playIndex(index + 1, why);
+}
 function prev(why) {
-  if (active().currentTime > 3) { active().currentTime = 0; log(`${why}: voltou ao início`); }
+  log(`${why} (pressionado na faixa ${index + 1}, em ${fmt(active().currentTime)})`);
+  if (active().currentTime > 3) { active().currentTime = 0; log(`${why}: voltou ao início da faixa`); }
   else playIndex(Math.max(0, index - 1), why);
 }
 function togglePlay() {
