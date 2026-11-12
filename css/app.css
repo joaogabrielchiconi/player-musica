@@ -70,9 +70,9 @@ h1 { flex: 0 1 auto; min-width: 0; margin: 0; font-size: 34px; font-weight: 800;
 /* ---- listas ---- */
 main { padding-bottom: calc(var(--mini-h) + var(--tabs-h) + env(safe-area-inset-bottom) + 24px); }
 .tracks { list-style: none; margin: 0; padding: 0; }
-.row { position: relative; display: grid; grid-template-columns: 1fr 44px 44px; align-items: center; min-height: 60px; padding: 6px 8px 6px 20px;
+.row { position: relative; display: grid; grid-template-columns: 1fr 44px; align-items: center; min-height: 60px; padding: 6px 8px 6px 20px;
        border-bottom: 1px solid var(--line); cursor: pointer; content-visibility: auto; contain-intrinsic-size: auto 60px; /* 2000 linhas rolam leves */ }
-.row.numbered { grid-template-columns: 30px 1fr 44px 44px; }
+.row.numbered { grid-template-columns: 30px 1fr 44px; }
 .row:active { background: var(--surface); }
 .row .lead { display: none; color: var(--muted); font-size: 13px; }
 .row.numbered .lead { display: block; }
@@ -83,13 +83,26 @@ main { padding-bottom: calc(var(--mini-h) + var(--tabs-h) + env(safe-area-inset-
 .row[aria-current] .title { color: var(--orange); }
 .row.off { opacity: .45; } /* sem internet e não baixada */
 .tag { align-self: flex-start; margin-top: 3px; padding: 1px 6px; border: 1px solid var(--yellow); border-radius: 4px; color: var(--yellow); font-size: 11px; font-weight: 600; }
-.dl, .add, .ctl { min-width: 44px; min-height: 44px; display: grid; place-items: center; padding: 0; border: 0; background: none; color: var(--muted); }
-.dl .ic, .add .ic { width: 22px; height: 22px; }
+.dl, .ctl { min-width: 44px; min-height: 44px; display: grid; place-items: center; padding: 0; border: 0; background: none; color: var(--muted); }
+.dl .ic { width: 22px; height: 22px; }
 .dl.done, .dl.busy { color: var(--yellow); }
+.dl.done { visibility: hidden; } /* baixada: a linha mostra só o nome (apagar o download: segurar o dedo na música) */
 .dl.busy .ic { display: none; }
 .dl .pct { font-size: 13px; font-weight: 600; }
 .ctl { color: var(--orange); }
 .ctl:disabled { color: var(--edge); }
+/* ---- seleção de várias músicas ---- */
+.row .pick { display: none; width: 24px; height: 24px; border: 2px solid var(--edge); border-radius: 50%; place-items: center; color: var(--on-orange); }
+.row .pick .ic { width: 16px; height: 16px; opacity: 0; }
+.selecting .row { grid-template-columns: 24px 1fr; gap: 14px; }
+.selecting .row.numbered { grid-template-columns: 24px 30px 1fr; }
+.selecting .row .pick { display: grid; }
+.selecting .row .dl { display: none; }
+.row.sel .pick { background: var(--orange); border-color: var(--orange); }
+.row.sel .pick .ic { opacity: 1; }
+.row.sel { background: var(--raised); }
+.selbar { position: sticky; top: calc(env(safe-area-inset-top) + 8px); z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 20px; background: var(--bg); border-bottom: 1px solid var(--edge); }
+.selbar .count { flex: 1 0 100%; font-weight: 700; }
 .row.edit { grid-template-columns: 1fr auto; cursor: default; }
 .ctls { display: flex; }
 /* o que está tocando agora: três barrinhas no canto, e só se mexem enquanto toca */

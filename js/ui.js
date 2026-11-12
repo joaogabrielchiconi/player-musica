@@ -57,6 +57,8 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
   let tab = 'songs';
   let detail = null; // { kind: 'artist' | 'playlist', group } (playlist: group = { id })
   let editing = false; // detalhe de playlist em modo de edição (▲ ▼ ✕)
+  let sel = null; // Set de IDs quando está selecionando várias músicas; senão null
+  let selBar = null;
   let nowId = null; // faixa tocando agora (para marcar a linha)
   let nowPlaying = false;
   const artUrls = new Map(); // albumKey -> object URL (fica enquanto o app está aberto)
@@ -111,7 +113,7 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
       li.querySelector('.sub').textContent = showAlbum ? `${t.artist} · ${t.album}` : t.artist;
       if (t.removedFromDrive) li.querySelector('.meta').append(el('span', { className: 'tag', textContent: 'removida do Drive' }));
       if (!isAvailable(t)) { li.classList.add('off'); li.ariaDisabled = 'true'; } // sem internet e não baixada
-      li.querySelector('.add').ariaLabel = `Adicionar ${t.title} a uma playlist`;
+      li.classList.toggle('sel', Boolean(sel?.has(t.id)));
       const b = li.querySelector('.dl');
       setDl(b, t);
       if (!dlButtons.has(t.id)) dlButtons.set(t.id, []);
@@ -120,13 +122,32 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
     });
     ul.append(frag);
     // Um só ouvinte por lista (em vez de um por botão): rola leve mesmo com milhares de músicas.
+    let pressTimer = 0;
+    let pressed = 0; // hora do último toque longo: o clique que vem junto é ignorado
+    const cancelPress = () => { clearTimeout(pressTimer); pressTimer = 0; };
+    ul.addEventListener('pointerdown', (e) => {
+      const li = e.target.closest('li.row');
+      if (!li || sel || e.target.closest('button')) return;
+      const x = e.clientX, y = e.clientY;
+      cancelPress();
+      pressTimer = setTimeout(() => { pressTimer = 0; pressed = Date.now(); trackMenu(byId.get(li.dataset.id)); }, 500);
+      li.onpointermove = (m) => { if (Math.hypot(m.clientX - x, m.clientY - y) > 10) cancelPress(); };
+    });
+    for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) ul.addEventListener(ev, cancelPress);
+    ul.addEventListener('contextmenu', (e) => e.preventDefault());
     ul.onclick = (e) => {
+      if (Date.now() - pressed < 700) return;
       const li = e.target.closest('li.row');
       if (!li) return;
       const t = byId.get(li.dataset.id);
+      if (sel) {
+        if (!sel.delete(t.id)) sel.add(t.id);
+        li.classList.toggle('sel', sel.has(t.id));
+        updateSelBar();
+        return;
+      }
       const act = e.target.closest('button')?.dataset.act;
-      if (act === 'add') pickPlaylist([t.id]);
-      else if (act === 'dl') downloads.toggle(t);
+      if (act === 'dl') downloads.toggle(t);
       else onPlay(t, list);
     };
     ul.onkeydown = (e) => {
@@ -158,10 +179,11 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
   });
 
   // Folha de baixo: escolhe a playlist (ou cria uma) para receber as faixas.
-  function pickPlaylist(ids) {
+  function pickPlaylist(ids, onDone) {
     const done = async (id) => {
       const n = await playlists.add(id, ids);
       handle.close();
+      onDone?.();
       toast(n ? `${count(n)} em "${playlists.get(id).name}".` : `Já estava em "${playlists.get(id).name}".`);
     };
     const list = el('ul', { className: 'sheet-list' });
@@ -184,6 +206,36 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
       el('button', { className: 'btn', type: 'button', textContent: 'Cancelar', onclick: () => handle.close() }));
     const handle = openSheet(sheet);
   }
+  // Segurar o dedo numa música: menu com o que dá para fazer com ela.
+  function trackMenu(t) {
+    const item = (text, ic, fn) => el('button', { className: 'btn', type: 'button', onclick: () => { handle.close(); fn(); } }, icon(ic), text);
+    const sheet = el('dialog', { className: 'sheet', ariaLabel: t.title },
+      el('h2', { textContent: t.title }),
+      item('Adicionar à playlist', 'plus', () => pickPlaylist([t.id])),
+      ...(downloads.state(t.id) === 'done' ? [item('Apagar download', 'x', () => downloads.toggle(t))] : []),
+      item('Selecionar várias', 'check', () => startSelect(t.id)),
+      el('button', { className: 'btn', type: 'button', textContent: 'Cancelar', onclick: () => handle.close() }));
+    const handle = openSheet(sheet);
+  }
+
+  const selected = () => tracks.filter((t) => sel?.has(t.id));
+  function startSelect(id) { sel = new Set([id]); render(); }
+  function endSelect() { if (sel) { sel = null; render(); } }
+  function updateSelBar() {
+    if (!selBar) return;
+    const list = selected();
+    selBar.querySelector('.count').textContent = list.length ? `${list.length} selecionada${list.length > 1 ? 's' : ''}` : 'Nenhuma selecionada';
+    for (const b of selBar.querySelectorAll('[data-need]')) b.disabled = b.dataset.need === 'dl' ? !list.some((t) => downloads.state(t.id) === 'done') : !list.length;
+  }
+  function makeSelBar() {
+    const b = (text, need, fn, cls = '') => { const x = el('button', { className: `btn ${cls}`, type: 'button', textContent: text, onclick: fn }); if (need) x.dataset.need = need; return x; };
+    selBar = el('div', { className: 'selbar' }, el('span', { className: 'count' }),
+      b('Adicionar à playlist', 'any', () => pickPlaylist(selected().map((t) => t.id), endSelect)),
+      b('Apagar downloads', 'dl', async () => { await downloads.removeAll(selected()); endSelect(); }, 'danger'),
+      b('Cancelar', null, endSelect));
+    updateSelBar();
+    return selBar;
+  }
   const addAllButton = (list) => el('button', { className: 'btn', type: 'button', onclick: () => pickPlaylist(list.map((t) => t.id)) }, icon('plus'), 'Adicionar à playlist');
 
   function renderPlaylistList() {
@@ -198,7 +250,7 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
         if (pl) openDetail('playlist', { id: pl.id }); else toast('Nome inválido.');
       },
     }, icon('plus'), 'Nova playlist')));
-    if (!all.length) return root.append(emptyState('cassette', 'Nenhuma playlist ainda', 'Toque em + numa música, ou em "Adicionar à playlist" num álbum.'));
+    if (!all.length) return root.append(emptyState('cassette', 'Nenhuma playlist ainda', 'Segure o dedo numa música e escolha "Adicionar à playlist".'));
     root.append(groupList(all, (pl) => ({ title: pl.name, sub: count(playlists.tracksOf(pl).length) }), (pl) => openDetail('playlist', { id: pl.id }), { chip: 'color' }));
   }
 
@@ -230,7 +282,7 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
       el('button', { className: 'btn primary', type: 'button', disabled: !list.some(isAvailable), onclick: () => onPlay(list.find(isAvailable), list) }, icon('play'), 'Tocar'),
       el('button', { className: 'btn', type: 'button', textContent: editing ? 'Pronto' : 'Editar', onclick: () => { editing = !editing; render(); } }),
       ...(list.length ? [bulkButton(list, 'playlist')] : [])));
-    if (!list.length) root.append(emptyState('cassette', 'Playlist vazia', 'Toque em + numa música, ou em "Adicionar à playlist" num álbum.'));
+    if (!list.length) root.append(emptyState('cassette', 'Playlist vazia', 'Segure o dedo numa música e escolha "Adicionar à playlist".'));
     else root.append(editing ? editRows(pl, list) : trackList(list, { numbered: true }));
     if (editing) {
       root.append(el('div', { className: 'actions' },
@@ -253,6 +305,7 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
   function openDetail(kind, group) {
     detail = { kind, group };
     editing = false;
+    sel = null;
     window.scrollTo(0, 0);
     render();
   }
@@ -260,6 +313,9 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
   // Desenha a tela atual. Sempre termina marcando a linha que está tocando.
   function build() {
     root.textContent = '';
+    root.classList.toggle('selecting', Boolean(sel));
+    selBar = null;
+    if (sel) root.append(makeSelBar());
     dlButtons = new Map();
     progressEl = null;
     const q = search.value;
@@ -324,10 +380,10 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
     return r;
   }
 
-  for (const b of tabs) b.onclick = () => { tab = b.dataset.tab; detail = null; editing = false; render(); };
-  back.onclick = () => { detail = null; editing = false; render(); };
+  for (const b of tabs) b.onclick = () => { tab = b.dataset.tab; detail = null; editing = false; sel = null; render(); };
+  back.onclick = () => { detail = null; editing = false; sel = null; render(); };
   search.oninput = render;
-  onlyDownloaded.onchange = () => { detail = null; editing = false; render(); };
+  onlyDownloaded.onchange = () => { detail = null; editing = false; sel = null; render(); };
 
   return {
     refresh: render, // a internet caiu ou voltou, ou um download mudou: redesenha sem sair da tela atual

@@ -106,10 +106,10 @@
   <!-- Modelo de linha de música: a lista clona isto (mais leve que montar cada linha do zero). -->
   <template id="row-tpl">
     <li class="row" tabindex="0">
+      <span class="pick" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
       <span class="lead mono"></span>
       <div class="meta"><span class="title"></span><span class="sub"></span></div>
       <button class="dl" type="button" data-act="dl"><svg class="ic"><use href="#i-download"/></svg><span class="pct mono"></span></button>
-      <button class="add" type="button" data-act="add"><svg class="ic"><use href="#i-plus"/></svg></button>
     </li>
   </template>
 
