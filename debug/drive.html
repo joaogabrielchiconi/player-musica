@@ -24,6 +24,7 @@
     <button id="range">3. Ler 64 KB da 1ª faixa</button>
     <button id="expire">4. Simular token vencido</button>
     <button id="tags">5. Ler tags (T4)</button>
+    <button id="dump">6. Ver tag por dentro</button>
   </div>
   <div id="out" aria-live="polite"></div>
   <div id="covers"></div>
@@ -97,6 +98,35 @@
         } catch (err) { fail(err); }
       }
       say('tags lidas (veja abaixo do registro)');
+    };
+
+    // Diagnóstico: lista os frames da tag ID3 de cada faixa (id, tamanho, começo do conteúdo).
+    document.getElementById('dump').onclick = async () => {
+      if (!tracks.length) return say('liste a pasta antes (botão 2)');
+      const hex = (b) => [...b].map((x) => x.toString(16).padStart(2, '0')).join(' ');
+      for (const file of tracks) {
+        try {
+          const b = new Uint8Array(await drive.downloadRange(file.id, 0, 65535));
+          say(`— ${file.name}`);
+          say(`  início: ${hex(b.subarray(0, 10))}`);
+          if (String.fromCharCode(b[0], b[1], b[2]) !== 'ID3') { say('  sem tag ID3v2 no início'); continue; }
+          const ver = b[3], flags = b[5];
+          const ss = (i) => ((b[i] & 127) << 21) | ((b[i + 1] & 127) << 14) | ((b[i + 2] & 127) << 7) | (b[i + 3] & 127);
+          const be = (i) => ((b[i] << 24) | (b[i + 1] << 16) | (b[i + 2] << 8) | b[i + 3]) >>> 0;
+          say(`  ID3v2.${ver} · flags ${flags.toString(2)} · tamanho ${ss(6)}`);
+          let p = 10;
+          const end = Math.min(b.length, 10 + ss(6));
+          for (let n = 0; n < 30 && p + 10 <= end && b[p] !== 0; n++) {
+            const id = ver === 2 ? String.fromCharCode(...b.subarray(p, p + 3)) : String.fromCharCode(...b.subarray(p, p + 4));
+            const size = ver === 2 ? (b[p + 3] << 16) | (b[p + 4] << 8) | b[p + 5] : ver === 4 ? ss(p + 4) : be(p + 4);
+            const head = ver === 2 ? 6 : 10;
+            const data = b.subarray(p + head, p + head + Math.min(size, 48));
+            const txt = new TextDecoder('latin1').decode(data).replace(/[\x00-\x1f]/g, '·');
+            say(`  ${id} (${size} B): ${txt}`);
+            p += head + size;
+          }
+        } catch (err) { fail(err); }
+      }
     };
 
     status();
