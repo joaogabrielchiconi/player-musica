@@ -294,13 +294,15 @@ O player passa a tocar do `audio` quando a faixa está baixada.
 - baixar a playlist inteira (usando a T10).
 
 **Critérios de aceite:**
-- [ ] Uma playlist criada com 5 faixas, reordenada, aparece na nova ordem depois de reabrir o app.
-- [ ] "Baixar playlist" deixa as 5 faixas tocando offline.
-- [ ] Apagar uma playlist não apaga as faixas nem os downloads.
+- [x] Uma playlist criada com 5 faixas, reordenada, aparece na nova ordem depois de reabrir o app.
+- [x] "Baixar playlist" deixa as 5 faixas tocando offline.
+- [x] Apagar uma playlist não apaga as faixas nem os downloads.
 
 **Verificação:**
-- [ ] `node --test tests/playlists.test.js`
-- [ ] Manual no iPhone.
+- [x] `node --test tests/playlists.test.js`
+- [x] Manual no iPhone.
+
+**Resultado (12/11/2026):** aprovado no iPhone ("Deu certo"). Nome e confirmações usam `prompt`/`confirm` do navegador (provisório até a T13). A playlist guarda só IDs e `playlists.js` já tem `sanitize()` para o backup da T12 reaproveitar.
 
 **Depende de:** T8, T10 · **Arquivos:** `js/playlists.js`, `js/ui.js`, `index.html`, `tests/playlists.test.js` · **Tamanho:** M
 
