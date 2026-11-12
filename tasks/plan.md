@@ -44,7 +44,7 @@ contas (T0)
 - [ ] T3: Login e Drive definitivos
 - [ ] T4: Leitura de tags
 
-**Checkpoint:** `node --test tests/` passa; login renova sozinho ou pede "Entrar" sem quebrar.
+**Checkpoint:** `node --test` passa; quando o token vence, o app pede "Entrar" sem quebrar nem perder dados.
 
 ### Fase 2: Biblioteca
 - [ ] T5: Sincronizar a biblioteca com o Drive

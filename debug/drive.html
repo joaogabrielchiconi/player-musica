@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>Teste do login e Drive</title>
+  <style>
+    body { margin: 0; background: #111; color: #eee; font: 16px/1.4 -apple-system, system-ui, sans-serif;
+           padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 16px); }
+    h1 { font-size: 20px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+    button { min-height: 44px; padding: 0 16px; border: 1px solid #333; border-radius: 10px; background: #222; color: #eee; font: inherit; }
+    #out { white-space: pre-wrap; font: 13px/1.5 ui-monospace, Menlo, monospace; background: #000; border: 1px solid #333; border-radius: 8px; padding: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Teste do login e Drive (T3)</h1>
+  <div class="row">
+    <button id="signin">1. Entrar com Google</button>
+    <button id="list">2. Listar Músicas</button>
+    <button id="range">3. Ler 64 KB da 1ª faixa</button>
+    <button id="expire">4. Simular token vencido</button>
+  </div>
+  <div id="out" aria-live="polite"></div>
+
+  <script type="module">
+    import { signIn, getToken, tokenMinutesLeft, clearToken } from '../js/auth.js';
+    import { createDrive } from '../js/drive.js';
+    import { put, get } from '../js/db.js';
+
+    const out = document.getElementById('out');
+    const say = (msg) => { out.textContent += `${new Date().toLocaleTimeString('pt-BR')} ${msg}\n`; };
+    const fail = (err) => say(`${err.name}: ${err.message}`);
+    // Só para este teste: no 401 apaga o token e não renova (renovar exige um toque).
+    const drive = createDrive({ getToken, onUnauthorized: () => { clearToken(); return null; } });
+    let tracks = [];
+
+    const status = () => say(getToken() ? `logado: token vale mais ${tokenMinutesLeft()} min` : 'não logado');
+
+    document.getElementById('signin').onclick = () => {
+      signIn().then(() => { say('login OK'); status(); }).catch(fail);
+    };
+
+    document.getElementById('list').onclick = async () => {
+      try {
+        const t0 = performance.now();
+        const folderId = await drive.findFolder('Músicas');
+        if (!folderId) return say('pasta Músicas não encontrada na raiz do Drive');
+        await put('meta', 'folderId', folderId); // fica só neste aparelho
+        tracks = await drive.listAudio(folderId);
+        say(`${tracks.length} faixa(s) em ${((performance.now() - t0) / 1000).toFixed(1)} s:`);
+        for (const t of tracks) say(`  ${t.folder ? t.folder + '/' : ''}${t.name} (${(t.size / 1048576).toFixed(1)} MB)`);
+      } catch (err) { fail(err); }
+    };
+
+    document.getElementById('range').onclick = async () => {
+      try {
+        if (!tracks.length) return say('liste a pasta antes (botão 2)');
+        const buf = await drive.downloadRange(tracks[0].id, 0, 65535);
+        const head = new TextDecoder('latin1').decode(new Uint8Array(buf, 0, 3));
+        say(`leu ${buf.byteLength} bytes de "${tracks[0].name}" · começa com "${head}" ${head === 'ID3' ? '(tem tag ID3)' : ''}`);
+      } catch (err) { fail(err); }
+    };
+
+    document.getElementById('expire').onclick = async () => {
+      // Token inválido mas com validade futura: o Drive responde 401, como acontece depois de 1 h.
+      localStorage.setItem('auth_token', JSON.stringify({ value: 'token-falso', expiresAt: Date.now() + 3600_000 }));
+      say('token trocado por um inválido; listando…');
+      try { await drive.listAudio((await get('meta', 'folderId')) ?? 'root'); say('ERRO: deveria ter falhado'); }
+      catch (err) {
+        fail(err);
+        say(`token apagado: ${getToken() === null} · pasta ainda salva no aparelho: ${Boolean(await get('meta', 'folderId'))}`);
+        say('Agora toque em "1. Entrar com Google" de novo.');
+      }
+    };
+
+    status();
+  </script>
+</body>
+</html>

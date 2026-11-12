@@ -2,7 +2,7 @@
 
 Spec: [`../SPEC.md`](../SPEC.md) · Plano: [`plan.md`](plan.md)
 
-Comandos: `node --test tests/` (testes) · `git push origin main` (publica no Pages em cerca de 1 min).
+Comandos: `node --test` (testes) · `git push origin main` (publica no Pages em cerca de 1 min).
 
 Pronto, em toda tarefa, significa:
 - os testes passam;
@@ -90,7 +90,7 @@ Também mede o tempo entre o toque e o início do som.
 ### T3: Login e Drive definitivos
 
 **Descrição:**
-- `js/auth.js`: o fluxo vencedor da T1, com renovação silenciosa e botão "Entrar" quando ela falhar.
+- `js/auth.js`: o fluxo vencedor da T1 (popup). A renovação é um toque em "Entrar": o popup tenta `prompt=none` primeiro e mostra a tela do Google só se precisar. Renovação 100% silenciosa não existe sem servidor.
 - `js/drive.js`:
   - achar a pasta pelo nome e guardar o ID no `meta`;
   - listar com recursão e paginação;
@@ -98,9 +98,9 @@ Também mede o tempo entre o toque e o início do som.
   - repetir a chamada uma vez depois de renovar o token, se der 401.
 
 **Critérios de aceite:**
-- [ ] Uma pasta com subpastas e mais de 1000 arquivos é listada por completo (teste com `fetch` falso).
-- [ ] Com o token expirado, a chamada renova e repete. Se a renovação falhar, aparece "Entrar" e nenhum dado local é apagado.
-- [ ] O ID da pasta não aparece em nenhum arquivo do repositório.
+- [x] Uma pasta com subpastas e mais de 1000 arquivos é listada por completo (teste com `fetch` falso).
+- [ ] Num 401, a chamada tenta renovar uma vez (se houver como) e senão falha com `AuthError`: aparece "Entrar" e nenhum dado local é apagado.
+- [x] O ID da pasta não aparece em nenhum arquivo do repositório.
 
 **Verificação:**
 - [ ] `node --test tests/drive.test.js`
@@ -125,8 +125,8 @@ Também mede o tempo entre o toque e o início do som.
 **Depende de:** T1 · **Arquivos:** `js/tags.js`, `vendor/…`, `tests/tags.test.js`, `tests/fixtures/*` · **Tamanho:** M
 
 ### Checkpoint: Fundação
-- [ ] `node --test tests/` passa.
-- [ ] O login renova sozinho ou pede "Entrar" sem quebrar.
+- [ ] `node --test` passa.
+- [ ] Quando o token vence, o app pede "Entrar" sem quebrar nem perder dados.
 
 ---
 
@@ -349,7 +349,7 @@ Respeitar a área segura do iPhone (notch e barra inferior).
 - [ ] Os 10 critérios da spec foram marcados como verificados no iPhone.
 
 **Verificação:**
-- [ ] `node --test tests/`
+- [ ] `node --test`
 - [ ] Manual: o checklist final abaixo.
 
 **Depende de:** T13 · **Arquivos:** `manifest.webmanifest`, `icons/*`, `index.html`, `css/app.css` · **Tamanho:** S

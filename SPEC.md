@@ -54,7 +54,8 @@ Ouvir a biblioteca pessoal de músicas guardada no Google Drive sem pagar stream
 - Escopos:
   - `https://www.googleapis.com/auth/drive.readonly` para ler a pasta.
   - `https://www.googleapis.com/auth/drive.appdata` para o arquivo de backup, que fica numa pasta escondida e exclusiva do app.
-- O token de acesso dura cerca de 1 hora. O app tenta renovar sem interação. Se não conseguir, mostra o botão "Entrar com Google". Tocar o que já foi baixado nunca exige login.
+- O token de acesso dura cerca de 1 hora. **Sem servidor, não existe renovação 100% silenciosa:** o Safari bloqueia o login escondido (iframe) e só abre popup depois de um toque. Por isso a renovação é **um toque em "Entrar"**. O popup tenta primeiro sem tela (`prompt=none`) e só mostra a tela do Google se ela for necessária. Tocar o que já foi baixado nunca exige login.
+- Num 401, o token é apagado e a chamada falha com `AuthError`. Nenhum dado local é apagado.
 - Fluxo de login: **popup**, que foi validado no protótipo com o app instalado.
 - O Client ID fica em `js/config.js`. Ele é público por natureza e não é segredo. O app não tem client secret.
 
@@ -126,7 +127,7 @@ Ouvir a biblioteca pessoal de músicas guardada no Google Drive sem pagar stream
 npx --yes serve -l 5173 .
 
 # testes da lógica pura
-node --test tests/
+node --test
 
 # publicar (o GitHub Pages atualiza sozinho em cerca de 1 min)
 git push origin main
@@ -194,7 +195,7 @@ export function groupByAlbum(tracks) {
 ## Limites
 
 - **Sempre:**
-  - Rodar `node --test tests/` antes de cada commit.
+  - Rodar `node --test` antes de cada commit.
   - Verificar no iPhone cada tarefa que toca o iOS.
   - Tratar erros de rede e de token (expirado, offline) sem perder dados locais.
   - Manter a interface utilizável sem internet.
@@ -221,7 +222,7 @@ export function groupByAlbum(tracks) {
 7. **Backup:** depois de apagar os dados do app e entrar de novo, as playlists voltam do backup no Drive.
 8. **Retomar:** fechar e reabrir o app volta à mesma música, ao mesmo ponto (±5 s) e à mesma fila.
 9. **Drive intacto:** nenhuma chamada de escrita ao Drive fora do `appDataFolder` (conferido no código e na tela de permissões do Google).
-10. **Testes:** `node --test tests/` passa.
+10. **Testes:** `node --test` passa.
 
 ## Perguntas em aberto
 

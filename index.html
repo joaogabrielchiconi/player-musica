@@ -14,5 +14,10 @@
     <h1>Player de Música</h1>
     <p>Em construção. Se você está vendo isto no iPhone, o GitHub Pages está funcionando.</p>
   </main>
+  <!-- Esta página é o retorno do login do Google (REDIRECT_URI): repassa o token e fecha o popup. -->
+  <script type="module">
+    import { handleAuthReturn } from './js/auth.js';
+    handleAuthReturn();
+  </script>
 </body>
 </html>
