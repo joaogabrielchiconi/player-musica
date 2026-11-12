@@ -134,7 +134,7 @@ $('list').onclick = async () => {
 };
 
 // ---------- experimentos (v2): som mudo na troca de faixa com a tela bloqueada ----------
-const VERSION = 'v6';
+const VERSION = 'v7';
 // v2 confirmou: as duas opções juntas resolvem o som mudo com a tela bloqueada.
 const OPTS = { optSession: ['opt_session', true], optTwo: ['opt_two', true] };
 const opts = {};
@@ -309,6 +309,8 @@ for (const el of players) {
     $('time').textContent = `${fmt(el.currentTime)} / ${fmt(el.duration)}`;
     if (!('setPositionState' in navigator.mediaSession)) return;
     try { navigator.mediaSession.setPositionState({ duration: el.duration, position: el.currentTime, playbackRate: 1 }); } catch {}
+    // No iOS, setPositionState faz a tela de bloqueio esquecer o estado: precisa reafirmar depois de cada chamada.
+    setPlaybackState(el.paused ? 'paused' : 'playing');
   });
 }
 
