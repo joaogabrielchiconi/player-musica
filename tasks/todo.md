@@ -316,18 +316,20 @@ O player passa a tocar do `audio` quando a faixa está baixada.
 - Formato com `version: 1`. As faixas são guardadas pelo ID do Drive.
 
 **Critérios de aceite:**
-- [ ] Apagar os dados do app (Ajustes > Safari > Avançado > Dados de Sites) e entrar de novo restaura as playlists (critério 7).
-- [ ] Nenhuma chamada de escrita sai do `appDataFolder` (conferir `drive.js`).
-- [ ] Um backup com uma faixa que não existe mais é restaurado sem essa faixa, e o app avisa.
+- [x] Apagar os dados do app (Ajustes > Safari > Avançado > Dados de Sites) e entrar de novo restaura as playlists (critério 7).
+- [x] Nenhuma chamada de escrita sai do `appDataFolder` (conferir `drive.js`). (`tests/drive.test.js` confere no código e recusa ID de fora.)
+- [x] Um backup com uma faixa que não existe mais é restaurado sem essa faixa, e o app avisa.
 
 **Verificação:**
-- [ ] `node --test tests/playlists.test.js` (serialização)
-- [ ] Manual no iPhone.
+- [x] `node --test tests/playlists.test.js` (serialização)
+- [x] Manual no iPhone.
+
+**Resultado (12/11/2026):** aprovado no iPhone ("Voltaram"): app removido da Tela de Início, reinstalado, login, e as playlists voltaram do Drive. Regra de segurança: só grava o backup depois de conferir o existente (uma vez por instalação, com a biblioteca completa), então app novo nunca sobrescreve o backup com lista vazia.
 
 **Depende de:** T11, T3 · **Arquivos:** `js/playlists.js`, `js/drive.js`, `tests/playlists.test.js` · **Tamanho:** S
 
 ### Checkpoint: Offline e playlists
-- [ ] Os critérios 5, 6 e 7 da spec passam no iPhone em modo avião.
+- [x] Os critérios 5, 6 e 7 da spec passam no iPhone em modo avião. (5: T10/T11; 6: T10; 7: T12.)
 
 ---
 
