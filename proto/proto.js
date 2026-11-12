@@ -133,11 +133,44 @@ $('list').onclick = async () => {
   } catch (err) { log(`erro: ${err.message}`); }
 };
 
+// ---------- experimentos (v2): som mudo na troca de faixa com a tela bloqueada ----------
+const VERSION = 'v2';
+const OPTS = { optSession: ['opt_session', true], optTwo: ['opt_two', false] };
+const opts = {};
+for (const [id, [key, def]] of Object.entries(OPTS)) {
+  const v = localStorage.getItem(key);
+  opts[id] = v === null ? def : v === '1';
+  $(id).checked = opts[id];
+  $(id).onchange = () => { opts[id] = $(id).checked; localStorage.setItem(key, opts[id] ? '1' : '0'); log(`opção ${id}: ${opts[id]}`); };
+}
+// Hipótese 1: sem sessão "playback", o iOS deixa a mídia nova mudar de faixa em segundo plano, mas sem som.
+function applyAudioSession() {
+  if (!opts.optSession) return;
+  if (!navigator.audioSession) return log('navigator.audioSession não existe neste iOS');
+  if (navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback';
+}
+
 // ---------- reprodução ----------
+// Hipótese 2: no intervalo entre "ended" e o próximo play() o iOS desativa o áudio do app.
+// Com dois elementos, a próxima faixa começa ~1 s antes do fim da atual, sem intervalo.
+const players = [audio, new Audio()];
+players[1].playsInline = true;
+players[1].preload = 'auto';
+let cur = 0; // qual elemento de players está tocando
+const urls = new Map(); // elemento -> blob URL atual
 let index = -1;
-let currentUrl = null;
 let prefetch = null; // { index, promise }
+let prepared = null; // { index, el }: próxima faixa já carregada no elemento parado
+let advancing = false;
+const active = () => players[cur];
 const mb = (n) => `${(Number(n) / 1048576).toFixed(1)} MB`;
+
+function setSrc(el, blob) {
+  if (urls.has(el)) URL.revokeObjectURL(urls.get(el));
+  const url = URL.createObjectURL(blob);
+  urls.set(el, url);
+  el.src = url;
+}
 
 function renderTracks() {
   $('tracks').innerHTML = '';
@@ -159,8 +192,16 @@ function fetchBlob(i) {
 function startPrefetch(i) {
   if (i < 0 || i >= tracks.length || prefetch?.index === i) return;
   log(`pré-carregando faixa ${i + 1}`);
-  prefetch = { index: i, promise: fetchBlob(i) };
-  prefetch.promise.catch((err) => { log(`erro no pré-carregamento: ${err.message}`); prefetch = null; });
+  const promise = fetchBlob(i);
+  prefetch = { index: i, promise };
+  promise.then((blob) => {
+    if (!opts.optTwo || prefetch?.index !== i || index !== i - 1) return;
+    const el = players[1 - cur];
+    setSrc(el, blob);
+    el.load();
+    prepared = { index: i, el };
+    log(`faixa ${i + 1} preparada no 2º elemento`);
+  }).catch((err) => { log(`erro no pré-carregamento: ${err.message}`); if (prefetch?.index === i) prefetch = null; });
 }
 
 async function playIndex(i, reason) {
@@ -168,28 +209,50 @@ async function playIndex(i, reason) {
   const t0 = performance.now();
   index = i;
   renderTracks();
-  log(`faixa ${i + 1} (${reason})`);
+  applyAudioSession();
+  log(`faixa ${i + 1} (${reason}) · sessão=${navigator.audioSession?.type ?? 'n/d'} · 2 elementos=${opts.optTwo}`);
   try {
-    const blob = await (prefetch?.index === i ? prefetch.promise : fetchBlob(i));
-    if (index !== i) return; // usuário pulou para outra faixa enquanto baixava
+    const old = active();
+    let el;
+    if (prepared?.index === i) el = prepared.el;
+    else {
+      const blob = await (prefetch?.index === i ? prefetch.promise : fetchBlob(i));
+      if (index !== i) return; // usuário pulou para outra faixa enquanto baixava
+      el = opts.optTwo ? players[1 - cur] : old;
+      setSrc(el, blob);
+    }
+    prepared = null;
     prefetch = null;
-    if (currentUrl) URL.revokeObjectURL(currentUrl);
-    currentUrl = URL.createObjectURL(blob);
-    audio.src = currentUrl;
-    audio.addEventListener('playing', () => log(`tocando faixa ${i + 1}: ${((performance.now() - t0) / 1000).toFixed(1)} s desde o pedido`), { once: true });
+    el.addEventListener('playing', () => log(`tocando faixa ${i + 1}: ${((performance.now() - t0) / 1000).toFixed(1)} s desde o pedido`), { once: true });
     setMediaSession(tracks[i]);
-    await audio.play();
+    cur = players.indexOf(el); // antes do play(), para os eventos do novo elemento contarem como ativos
+    await el.play();
+    if (el !== old) old.pause(); // só pausa a anterior depois que a nova já está tocando
   } catch (err) { log(`erro ao tocar faixa ${i + 1}: ${err.message}`); }
+  advancing = false;
 }
 
-audio.addEventListener('playing', () => startPrefetch(index + 1));
-audio.addEventListener('ended', () => { log(`terminou faixa ${index + 1}`); playIndex(index + 1, 'fim da anterior'); });
-audio.addEventListener('pause', () => { if (!audio.ended) log('pausado'); });
-audio.addEventListener('error', () => log(`erro do <audio>: ${audio.error?.code}`));
-audio.addEventListener('timeupdate', () => {
-  if (!('setPositionState' in navigator.mediaSession) || !audio.duration) return;
-  try { navigator.mediaSession.setPositionState({ duration: audio.duration, position: audio.currentTime, playbackRate: 1 }); } catch {}
-});
+for (const el of players) {
+  const n = players.indexOf(el) + 1;
+  el.addEventListener('playing', () => { if (el === active()) startPrefetch(index + 1); });
+  el.addEventListener('ended', () => {
+    if (el !== active() || advancing) return;
+    log(`terminou faixa ${index + 1}`);
+    playIndex(index + 1, 'fim da anterior');
+  });
+  el.addEventListener('pause', () => { if (el === active() && !el.ended) log('pausado'); });
+  el.addEventListener('error', () => log(`erro do <audio> ${n}: ${el.error?.code}`));
+  el.addEventListener('timeupdate', () => {
+    if (el !== active() || !el.duration) return;
+    if (opts.optTwo && !advancing && prepared?.index === index + 1 && el.duration - el.currentTime < 1) {
+      advancing = true;
+      log(`sobreposição: começando faixa ${index + 2} antes do fim`);
+      playIndex(index + 1, 'fim (sobreposição)');
+    }
+    if (!('setPositionState' in navigator.mediaSession)) return;
+    try { navigator.mediaSession.setPositionState({ duration: el.duration, position: el.currentTime, playbackRate: 1 }); } catch {}
+  });
+}
 
 function setMediaSession(t) {
   if (!('mediaSession' in navigator)) return log('Media Session não disponível');
@@ -200,14 +263,14 @@ function setMediaSession(t) {
 }
 if ('mediaSession' in navigator) {
   const ms = navigator.mediaSession;
-  ms.setActionHandler('play', () => { log('tela de bloqueio: play'); audio.play(); });
-  ms.setActionHandler('pause', () => { log('tela de bloqueio: pause'); audio.pause(); });
+  ms.setActionHandler('play', () => { log('tela de bloqueio: play'); applyAudioSession(); active().play(); });
+  ms.setActionHandler('pause', () => { log('tela de bloqueio: pause'); active().pause(); });
   ms.setActionHandler('nexttrack', () => playIndex(index + 1, 'tela de bloqueio: próxima'));
   ms.setActionHandler('previoustrack', () => {
-    if (audio.currentTime > 3) { audio.currentTime = 0; log('tela de bloqueio: voltou ao início'); }
+    if (active().currentTime > 3) { active().currentTime = 0; log('tela de bloqueio: voltou ao início'); }
     else playIndex(Math.max(0, index - 1), 'tela de bloqueio: anterior');
   });
-  try { ms.setActionHandler('seekto', (d) => { audio.currentTime = d.seekTime; }); } catch {}
+  try { ms.setActionHandler('seekto', (d) => { active().currentTime = d.seekTime; }); } catch {}
 }
 
 $('playAll').onclick = () => playIndex(0, 'tocar tudo');
@@ -219,6 +282,7 @@ function refreshButtons() {
 }
 
 // ---------- início ----------
+$('mode').textContent += ` · protótipo ${VERSION}`;
 if (!GOOGLE_CLIENT_ID) log('falta GOOGLE_CLIENT_ID em js/config.js');
 handleRedirectReturn();
 refreshButtons();

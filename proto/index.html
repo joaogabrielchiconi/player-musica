@@ -25,6 +25,9 @@
     li { padding: 6px 0; }
     li.now { color: var(--accent); font-weight: 600; }
     audio { width: 100%; margin: 8px 0; }
+    fieldset { border: 1px solid var(--line); border-radius: 10px; margin: 12px 0; padding: 8px 12px; }
+    fieldset label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+    fieldset input { width: 22px; height: 22px; }
     #log { white-space: pre-wrap; font: 12px/1.4 ui-monospace, Menlo, monospace; background: #000; border: 1px solid var(--line);
            border-radius: 8px; padding: 8px; max-height: 40vh; overflow: auto; }
   </style>
@@ -43,6 +46,12 @@
     <button id="playAll" disabled>Tocar tudo</button>
   </div>
 
+  <fieldset>
+    <legend>Experimentos (som mudo com a tela bloqueada)</legend>
+    <label><input type="checkbox" id="optSession"> Sessão de áudio "playback"</label><br>
+    <label><input type="checkbox" id="optTwo"> Dois elementos de áudio (sobreposição)</label>
+  </fieldset>
+
   <audio id="audio" controls playsinline></audio>
   <ol id="tracks"></ol>
 
@@ -51,6 +60,6 @@
   </div>
   <div id="log" aria-live="polite"></div>
 
-  <script type="module" src="proto.js"></script>
+  <script type="module" src="proto.js?v=2"></script>
 </body>
 </html>
