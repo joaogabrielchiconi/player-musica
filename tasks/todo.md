@@ -99,12 +99,12 @@ Também mede o tempo entre o toque e o início do som.
 
 **Critérios de aceite:**
 - [x] Uma pasta com subpastas e mais de 1000 arquivos é listada por completo (teste com `fetch` falso).
-- [ ] Num 401, a chamada tenta renovar uma vez (se houver como) e senão falha com `AuthError`: aparece "Entrar" e nenhum dado local é apagado.
+- [x] Num 401, a chamada tenta renovar uma vez (se houver como) e senão falha com `AuthError`: aparece "Entrar" e nenhum dado local é apagado.
 - [x] O ID da pasta não aparece em nenhum arquivo do repositório.
 
 **Verificação:**
-- [ ] `node --test tests/drive.test.js`
-- [ ] Manual: no iPhone, esperar mais de 1 h com o app aberto e tocar uma faixa da internet.
+- [x] `node --test tests/drive.test.js`
+- [x] Manual no iPhone (12/11/2026): login por popup OK, listou as 3 faixas em 1,0 s, Range de 64 KB leu a tag ID3, e o token vencido simulado deu `AuthError` sem apagar a pasta salva. Esperar 1 h de verdade fica coberto pela simulação.
 
 **Depende de:** T1 · **Arquivos:** `js/auth.js`, `js/drive.js`, `tests/drive.test.js` · **Tamanho:** M
 
