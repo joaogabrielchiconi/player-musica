@@ -134,7 +134,7 @@ $('list').onclick = async () => {
 };
 
 // ---------- experimentos (v2): som mudo na troca de faixa com a tela bloqueada ----------
-const VERSION = 'v5';
+const VERSION = 'v6';
 // v2 confirmou: as duas opções juntas resolvem o som mudo com a tela bloqueada.
 const OPTS = { optSession: ['opt_session', true], optTwo: ['opt_two', true] };
 const opts = {};
@@ -228,6 +228,19 @@ function release(el) {
   if (urls.has(el)) { URL.revokeObjectURL(urls.get(el)); urls.delete(el); }
 }
 
+// v5 reafirmava na hora e não adiantou: o iOS processa a pausa do elemento anterior depois.
+// Tocar no ▶ da tela de bloqueio (que chama play() de novo) corrigia o ícone, então repetimos isso com atraso.
+function reassertPlaying(i) {
+  setTimeout(() => {
+    if (index !== i || active().paused) return;
+    applyAudioSession();
+    setMediaSession(tracks[i]);
+    setPlaybackState('playing');
+    active().play().catch(() => {});
+    log(`reafirmou "tocando" (faixa ${i + 1}) · estado=${navigator.mediaSession?.playbackState}`);
+  }, 600);
+}
+
 function setPlaybackState(state) {
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = state;
 }
@@ -261,10 +274,7 @@ async function playIndex(i, reason) {
     cur = players.indexOf(el); // antes do play(), para os eventos do novo elemento contarem como ativos
     await el.play();
     if (el !== old) release(old); // só solta a anterior depois que a nova já está tocando
-    // Reafirma o estado depois da troca: só "playing" de novo não muda nada para o iOS.
-    setPlaybackState('paused');
-    setPlaybackState('playing');
-    setMediaSession(tracks[i]);
+    reassertPlaying(i);
   } catch (err) { log(`erro ao tocar faixa ${i + 1}: ${err.message}`); }
   advancing = false;
 }
