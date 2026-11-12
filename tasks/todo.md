@@ -244,12 +244,14 @@ Mini player fixo embaixo, que abre o player em tela cheia com a fila.
 - Filtro "Só baixadas".
 
 **Critérios de aceite:**
-- [ ] Em modo avião, o app instalado abre e mostra a biblioteca.
-- [ ] Sem internet, tocar uma faixa não baixada não faz nada além de um aviso curto.
-- [ ] Depois de publicar uma versão nova, o app passa a usá-la na segunda abertura.
+- [x] Em modo avião, o app instalado abre e mostra a biblioteca.
+- [x] Sem internet, tocar uma faixa não baixada não faz nada além de um aviso curto.
+- [x] Depois de publicar uma versão nova, o app passa a usá-la na segunda abertura.
 
 **Verificação:**
-- [ ] Manual: modo avião no iPhone, mais uma publicação de teste.
+- [x] Manual: modo avião no iPhone, mais uma publicação de teste.
+
+**Resultado (12/11/2026):** aprovado no iPhone. Modo avião: abriu com a biblioteca, faixas apagadas e só o aviso ao tocar. Publicação de teste ("TESTE VERSÃO NOVA") apareceu na 2ª abertura e foi retirada em seguida. Antes de cada publicação: `node scripts/sw-version.mjs` (o `tests/sw.test.js` falha se esquecer). De quebra, corrigido o mini player vazio aparecendo sem música (bug da T7).
 
 **Depende de:** T8 · **Arquivos:** `sw.js`, `index.html`, `js/app.js`, `js/ui.js` · **Tamanho:** M
 
