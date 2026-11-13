@@ -29,7 +29,7 @@ const chipColor = (s) => {
   return CHIPS[h % CHIPS.length];
 };
 const count = (n) => `${n} música${n === 1 ? '' : 's'}`;
-const TAB_TITLE = { songs: 'Músicas', artists: 'Artistas', playlists: 'Playlists', downloads: 'Baixadas' };
+const TAB_TITLE = { songs: 'Músicas', artists: 'Artistas', playlists: 'Playlists' };
 
 function emptyState(iconName, heading, text) {
   return el('div', { className: 'empty' }, icon(iconName), el('h2', { textContent: heading }), text ? el('p', { textContent: text }) : '');
@@ -340,7 +340,13 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
       setCount(null);
       return root.append(emptyState('cassette', 'Nenhuma música ainda', 'Entre com o Google e toque em atualizar para carregar a pasta Músicas do seu Drive.'));
     }
-    if (!pool.length) { setCount(0); return root.append(emptyState('download', 'Nenhuma música baixada', 'Toque no ícone de baixar numa música, ou em "Baixar todas" num álbum.')); }
+    if (tab === 'songs' && onlyDownloaded.checked) { // espaço usado e andamento dos downloads (antes ficava na aba Baixadas)
+      const space = el('p', { className: 'status', textContent: 'Calculando o espaço…' });
+      downloads.spaceText().then((text) => { space.textContent = text; }).catch(() => { space.textContent = ''; });
+      progressEl = el('p', { className: 'status', textContent: downloads.progressText() });
+      root.append(el('div', { className: 'panel' }, space, progressEl));
+    }
+    if (!pool.length) { setCount(0); return root.append(emptyState('download', 'Nenhuma música baixada', 'Toque no ícone de baixar numa música.')); }
     if (!found.length) { setCount(0); return root.append(emptyState('cassette', 'Nada encontrado', `Nenhuma música com "${q}".`)); }
 
     if (tab === 'songs') {
@@ -350,15 +356,6 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
       const groups = groupByArtist(found);
       setCount(groups.length);
       root.append(groupList(groups, (g) => ({ title: g.artist, sub: `${g.albums.length} álbum(ns) · ${count(g.tracks.length)}` }), (g) => openDetail('artist', g), { chip: null }));
-    } else {
-      const mine = sortTracks(found.filter(isDownloaded));
-      setCount(mine.length);
-      const space = el('p', { className: 'status', textContent: 'Calculando o espaço…' });
-      downloads.spaceText().then((text) => { space.textContent = text; }).catch(() => { space.textContent = ''; });
-      progressEl = el('p', { className: 'status', textContent: downloads.progressText() });
-      root.append(el('div', { className: 'panel' }, space, progressEl));
-      if (!mine.length) return root.append(emptyState('download', 'Nenhuma música baixada', 'Toque no ícone de baixar numa música, ou em "Baixar todas" num álbum.'));
-      root.append(trackList(mine));
     }
   }
 

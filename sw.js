@@ -5,7 +5,7 @@
 // falha se ele estiver velho). O navegador vê o sw.js diferente, baixa TODOS os arquivos para um cache
 // novo e só então troca (tudo ou nada: nunca mistura arquivos de versões diferentes).
 // A troca vale a partir da abertura seguinte do app.
-const VERSION = '7688b586e309';
+const VERSION = 'fff2176ae4a2';
 const CACHE = `app-${VERSION}`;
 const ASSETS = [
   './',
