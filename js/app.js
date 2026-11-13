@@ -12,6 +12,13 @@ import { confirmDialog } from './dialogs.js';
 
 const $ = (id) => document.getElementById(id);
 document.addEventListener('gesturestart', (e) => e.preventDefault()); // iOS: pinça de zoom no app inteiro
+// iOS: toque duplo em área vazia dá zoom; bloqueia só fora de controles (não rouba o 2º clique de botões/linhas)
+let lastTap = 0;
+document.addEventListener('touchend', (e) => {
+  const now = Date.now();
+  if (now - lastTap < 350 && !e.target.closest('button, a, input, select, textarea, label, [role="button"], li')) e.preventDefault();
+  lastTap = now;
+}, { passive: false });
 const drive = createDrive({ getToken, onUnauthorized: () => { clearToken(); return null; } });
 let syncing = false;
 
