@@ -46,7 +46,10 @@
     <div id="syncbar" class="syncbar" role="progressbar" aria-label="Lendo as músicas novas" aria-valuemin="0" aria-valuemax="100" hidden><i></i></div>
     <p class="status" id="status" aria-live="polite"></p>
     <input id="search" class="search" type="search" placeholder="Buscar música, artista ou álbum" aria-label="Buscar" autocomplete="off" enterkeyhint="search">
-    <label class="switch" id="filter"><input id="onlyDownloaded" type="checkbox"><span>Só baixadas</span></label>
+    <div class="filterrow">
+      <label class="switch" id="filter"><input id="onlyDownloaded" type="checkbox"><span>Só baixadas</span></label>
+      <button id="dlAll" class="btn" type="button" hidden></button>
+    </div>
   </header>
   <main id="library"></main>
   <p id="toast" class="toast" role="status" hidden></p>

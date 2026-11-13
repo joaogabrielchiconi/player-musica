@@ -312,6 +312,18 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
     render();
   }
 
+  // Botão do topo: baixa a biblioteca inteira; com tudo baixado, apaga todos os downloads (com confirmação).
+  const dlAll = document.getElementById('dlAll');
+  function updateDlAll() {
+    const states = tracks.map((t) => downloads.state(t.id));
+    dlAll.hidden = !tracks.length;
+    const missing = states.some((s) => !s);
+    const busy = !missing && states.some((s) => s !== 'done');
+    dlAll.textContent = missing ? 'Baixar tudo' : busy ? 'Baixando…' : 'Apagar tudo';
+    dlAll.disabled = busy;
+  }
+  dlAll.onclick = () => (tracks.some((t) => !downloads.state(t.id)) ? downloads.add(tracks) : downloads.removeAll(tracks));
+
   // Desenha a tela atual. Sempre termina marcando a linha que está tocando.
   function build() {
     root.textContent = '';
@@ -324,7 +336,8 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
     for (const b of tabs) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
     back.hidden = !detail;
     search.hidden = Boolean(detail) || tab === 'playlists';
-    onlyDownloaded.parentElement.hidden = search.hidden; // o filtro só vale para as listas de músicas
+    onlyDownloaded.closest('.filterrow').hidden = search.hidden; // o filtro só vale para as listas de músicas
+    updateDlAll();
 
     if (detail?.kind === 'playlist') return renderPlaylist(detail.group.id);
     if (detail?.kind === 'artist') {
@@ -390,6 +403,7 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
     updateDownload(id) {
       for (const { t, b } of dlButtons.get(id) ?? []) setDl(b, t);
       if (progressEl) progressEl.textContent = downloads.progressText();
+      updateDlAll();
     },
     setNowPlaying(id, playing) {
       if (id === nowId && playing === nowPlaying) return;
