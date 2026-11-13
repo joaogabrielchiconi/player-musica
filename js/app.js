@@ -11,6 +11,7 @@ import { createPlaylists, tracksOf, createPlaylistBackup } from './playlists.js'
 import { confirmDialog } from './dialogs.js';
 
 const $ = (id) => document.getElementById(id);
+document.addEventListener('gesturestart', (e) => e.preventDefault()); // iOS: pinça de zoom no app inteiro
 const drive = createDrive({ getToken, onUnauthorized: () => { clearToken(); return null; } });
 let syncing = false;
 

@@ -26,6 +26,8 @@ html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.4 var(--font); caret-color: var(--orange); }
 /* App, não página: segurar o dedo numa música não seleciona o texto nem abre o menu Copiar/Pesquisar. Campos de texto continuam normais. */
 body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+/* Sem zoom com dois dedos nem toque duplo (o iOS ignora user-scalable, então bloqueia pelo gesto). */
+html { touch-action: pan-x pan-y; }
 input, textarea { -webkit-user-select: text; user-select: text; }
 ::selection { background: var(--orange); color: var(--on-orange); }
 button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
