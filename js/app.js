@@ -220,6 +220,10 @@ const ui = createLibraryUI({
     const playable = online ? list : list.filter(isAvailable); // sem internet a fila só tem as baixadas
     player.playList(playable, playable.indexOf(t));
   },
+  onEnqueue: (t, next) => {
+    if (!canPlay(t)) return;
+    if (player.enqueue(t, next)) toast(next ? 'Toca a seguir.' : 'Adicionada à fila.');
+  },
   onlyDownloaded: $('onlyDownloaded'),
   isDownloaded: (t) => offline.has(t.id),
   isAvailable,

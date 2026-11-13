@@ -52,7 +52,7 @@ function emptyState(iconName, heading, text) {
  * @param {object} o.playlists  list(), get(id), tracksOf(pl), create(name), rename(id, name), remove(id), add(id, ids), removeAt(id, i), move(id, from, to)
  * @param {(text: string) => void} o.toast
  */
-export function createLibraryUI({ root, title, countEl, back, search, tabs, getArt, onPlay, onlyDownloaded, isDownloaded, isAvailable, downloads, playlists, toast }) {
+export function createLibraryUI({ root, title, countEl, back, search, tabs, getArt, onPlay, onlyDownloaded, isDownloaded, isAvailable, downloads, playlists, toast, onEnqueue }) {
   let tracks = [];
   let tab = 'songs';
   let detail = null; // { kind: 'artist' | 'playlist', group } (playlist: group = { id })
@@ -210,6 +210,8 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
     const item = (text, ic, fn) => el('button', { className: 'btn', type: 'button', onclick: () => { handle.close(); fn(); } }, icon(ic), text);
     const sheet = el('dialog', { className: 'sheet', ariaLabel: t.title },
       el('h2', { textContent: t.title }),
+      item('Tocar a seguir', 'plus', () => onEnqueue(t, true)),
+      item('Adicionar à fila', 'plus', () => onEnqueue(t, false)),
       item('Adicionar à playlist', 'plus', () => pickPlaylist([t.id])),
       ...(downloads.state(t.id) === 'done' ? [item('Apagar download', 'x', () => downloads.toggle(t))] : []),
       item('Selecionar várias', 'check', () => startSelect(t.id)),

@@ -49,6 +49,14 @@ export function withShuffle(q, shuffle, random = Math.random) {
   return { ...q, shuffle, order: makeOrder(q.items.length, idx, shuffle, random), pos: shuffle ? 0 : idx };
 }
 
+/** Põe a faixa logo depois da atual (next) ou no fim da fila. A mesma faixa pode entrar de novo: é um item novo. */
+export function enqueue(q, t, next) {
+  const items = [...q.items, t];
+  const order = [...q.order];
+  order.splice(next ? q.pos + 1 : order.length, 0, items.length - 1);
+  return { ...q, items, order };
+}
+
 // ---- estado salvo (T8): só IDs, posição e tempo; as faixas vêm do banco ao restaurar ----
 export function serializeState(q, time = 0, duration = 0) {
   return { v: 1, ids: q.items.map((t) => t.id), order: q.order, pos: q.pos, shuffle: q.shuffle, repeat: q.repeat, time, duration };

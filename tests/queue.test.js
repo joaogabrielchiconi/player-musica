@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newQueue, current, nextPos, prevPos, withShuffle, nextRepeat, trackAt, serializeState, restoreState } from '../js/queue.js';
+import { newQueue, current, nextPos, prevPos, withShuffle, nextRepeat, trackAt, enqueue, serializeState, restoreState } from '../js/queue.js';
 
 const items = ['a', 'b', 'c', 'd', 'e'];
 // Gerador previsível para o aleatório.
@@ -88,4 +88,13 @@ test('estado: faixa atual que não existe mais, ou dado corrompido, vira player 
 test('estado: tempo, repetir e aleatório inválidos viram valores seguros', () => {
   const r = restoreState({ v: 1, ids: ['a', 'b'], order: [0, 1], pos: 1, time: -5, duration: 'x', repeat: 'tudo', shuffle: 'sim' }, lib);
   assert.deepEqual([r.time, r.duration, r.q.repeat, r.q.shuffle, current(r.q).id], [0, 0, 'off', false, 'b']);
+});
+
+test('enqueue: a seguir entra depois da atual; fila entra no fim; repetida vale', () => {
+  let q = newQueue(items, 1);
+  q = enqueue(q, 'x', true);
+  q = enqueue(q, 'y', false);
+  q = enqueue(q, 'x', true);
+  assert.deepEqual(q.order.map((i) => q.items[i]), ['a', 'b', 'x', 'x', 'c', 'd', 'e', 'y']);
+  assert.equal(current(q), 'b');
 });

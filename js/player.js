@@ -5,7 +5,7 @@
 //   o anterior só pausa depois que o novo já está tocando;
 // - Media Session registrada de novo a cada faixa, com ⏮ ⏭ (seekbackward/seekforward nulos);
 // - playbackState informado explicitamente. Limitação aceita: o ícone ▶/⏸ da tela de bloqueio pode ficar em ▶.
-import { newQueue, current, trackAt, nextPos, prevPos, withShuffle, nextRepeat } from './queue.js';
+import { newQueue, current, trackAt, nextPos, prevPos, withShuffle, nextRepeat, enqueue } from './queue.js';
 
 /**
  * @param {object} o
@@ -215,6 +215,13 @@ export function createPlayer({ audio, download, artUrl, fallbackArt, onUpdate, o
   return {
     playList(list, index) { q = newQueue(list, index, { shuffle: q.shuffle, repeat: q.repeat }); prepared = null; prefetch = null; playPos(q.pos); },
     playAt(pos) { playPos(pos); },
+    // Sem nada tocando, a faixa vira a fila e toca na hora. Devolve true se só entrou na fila.
+    enqueue(t, next) {
+      if (!started || !current(q)) { this.playList([t], 0); return false; }
+      q = enqueue(q, t, next);
+      queueChanged();
+      return true;
+    },
     // Reabre pausado no ponto salvo, sem baixar nada até o ▶.
     restore(restoredQueue, t, duration) {
       q = restoredQueue;
