@@ -225,12 +225,14 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
     if (!selBar) return;
     const list = selected();
     selBar.querySelector('.count').textContent = list.length ? `${list.length} selecionada${list.length > 1 ? 's' : ''}` : 'Nenhuma selecionada';
-    for (const b of selBar.querySelectorAll('[data-need]')) b.disabled = b.dataset.need === 'dl' ? !list.some((t) => downloads.state(t.id) === 'done') : !list.length;
+    for (const b of selBar.querySelectorAll('[data-need]')) b.disabled = b.dataset.need === 'dl' ? !list.some((t) => downloads.state(t.id) === 'done')
+      : b.dataset.need === 'get' ? !list.some((t) => !downloads.state(t.id)) : !list.length;
   }
   function makeSelBar() {
     const b = (text, need, fn, cls = '') => { const x = el('button', { className: `btn ${cls}`, type: 'button', textContent: text, onclick: fn }); if (need) x.dataset.need = need; return x; };
     selBar = el('div', { className: 'selbar' }, el('span', { className: 'count' }),
       b('Adicionar à playlist', 'any', () => pickPlaylist(selected().map((t) => t.id), endSelect)),
+      b('Baixar', 'get', () => { downloads.add(selected()); endSelect(); }),
       b('Apagar downloads', 'dl', async () => { await downloads.removeAll(selected()); endSelect(); }, 'danger'),
       b('Cancelar', null, endSelect));
     updateSelBar();
