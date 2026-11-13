@@ -19,7 +19,7 @@ test('diff: novas, alteradas (md5, nome, pasta, voltou), removidas e iguais', ()
   const { added, changed, removed } = diffLibrary([a, b, c, d, e], local);
   assert.deepEqual(added.map((f) => f.id), ['e']);
   assert.deepEqual(changed.map((f) => f.id), ['b', 'c', 'd']);
-  assert.deepEqual(removed.map((t) => t.id), ['x']); // 'y' já estava marcada
+  assert.deepEqual(removed.map((t) => t.id), ['x', 'y']); // inclusive a que já estava marcada de versões antigas
 });
 
 test('diff: sem md5 (arquivo sem conteúdo binário) compara pela data', () => {
@@ -36,6 +36,7 @@ function memDb() {
     stores,
     get: async (n, k) => s(n).get(k),
     put: async (n, k, v) => { s(n).set(k, v); },
+    del: async (n, k) => { s(n).delete(k); },
     getAll: async (n) => [...s(n).values()],
   };
 }
@@ -66,7 +67,7 @@ test('sincroniza: grava faixas e capa; 2ª rodada sem mudança não baixa nada',
   const drive = fakeDrive([file('a'), file('b'), file('c')]);
   const progress = [];
   const r1 = await syncLibrary({ drive, db, onProgress: (p) => progress.push(p) });
-  assert.deepEqual(r1, { total: 3, added: 3, changed: 0, removed: 0 });
+  assert.deepEqual(r1, { total: 3, added: 3, changed: 0, removed: 0, removedIds: [] });
   const a = await db.get('tracks', 'a');
   assert.equal(a.title, 'Título a');
   assert.equal(a.artist, 'Banda');
@@ -78,23 +79,22 @@ test('sincroniza: grava faixas e capa; 2ª rodada sem mudança não baixa nada',
 
   const before = drive.ranges;
   const r2 = await syncLibrary({ drive, db });
-  assert.deepEqual(r2, { total: 3, added: 0, changed: 0, removed: 0 });
+  assert.deepEqual(r2, { total: 3, added: 0, changed: 0, removed: 0, removedIds: [] });
   assert.equal(drive.ranges, before);
 });
 
-test('faixa apagada do Drive fica marcada, não é apagada; volta se reaparecer', async () => {
+test('faixa apagada do Drive some da biblioteca e do celular', async () => {
   const db = memDb();
   const drive = fakeDrive([file('a'), file('b')]);
   await syncLibrary({ drive, db });
+  await db.put('audio', 'b', new Blob(['x']));
   drive.files.pop();
   const r = await syncLibrary({ drive, db });
   assert.equal(r.removed, 1);
-  assert.equal((await db.get('tracks', 'b')).removedFromDrive, true);
-  assert.equal((await db.getAll('tracks')).length, 2);
-
-  drive.files.push(file('b'));
-  await syncLibrary({ drive, db });
-  assert.equal((await db.get('tracks', 'b')).removedFromDrive, false);
+  assert.deepEqual(r.removedIds, ['b']);
+  assert.equal(await db.get('tracks', 'b'), undefined);
+  assert.equal(await db.get('audio', 'b'), undefined);
+  assert.equal((await db.getAll('tracks')).length, 1);
 });
 
 test('login vence no meio: o que foi gravado fica e a próxima rodada continua', async () => {

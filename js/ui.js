@@ -111,7 +111,6 @@ export function createLibraryUI({ root, title, countEl, back, search, tabs, getA
       li.querySelector('.lead').textContent = numbered ? String(t.trackNo ?? i + 1).padStart(2, '0') : '';
       li.querySelector('.title').textContent = t.title;
       li.querySelector('.sub').textContent = showAlbum ? `${t.artist} · ${t.album}` : t.artist;
-      if (t.removedFromDrive) li.querySelector('.meta').append(el('span', { className: 'tag', textContent: 'removida do Drive' }));
       if (!isAvailable(t)) { li.classList.add('off'); li.ariaDisabled = 'true'; } // sem internet e não baixada
       li.classList.toggle('sel', Boolean(sel?.has(t.id)));
       const b = li.querySelector('.dl');

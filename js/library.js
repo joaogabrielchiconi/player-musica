@@ -67,7 +67,7 @@ export function diffLibrary(driveFiles, localTracks) {
     if (!t) added.push(f);
     else if (!unchangedFile(t, f)) changed.push(f);
   }
-  const removed = localTracks.filter((t) => !seen.has(t.id) && !t.removedFromDrive);
+  const removed = localTracks.filter((t) => !seen.has(t.id));
   return { added, changed, removed };
 }
 
@@ -76,7 +76,7 @@ export function diffLibrary(driveFiles, localTracks) {
  * e repetida: o que já foi gravado fica, e a próxima rodada continua do ponto em que parou.
  * @param {object} o
  * @param {object} o.drive  createDrive(...)
- * @param {object} o.db     { get, put, getAll } de db.js
+ * @param {object} o.db     { get, put, del, getAll } de db.js
  * @param {(p: {phase: string, done?: number, total?: number}) => void} [o.onProgress]
  */
 export async function syncLibrary({ drive, db, onProgress = () => {}, concurrency = 4 }) {
@@ -117,10 +117,13 @@ export async function syncLibrary({ drive, db, onProgress = () => {}, concurrenc
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, total) }, worker));
 
-  // Nada é apagado: a faixa só ganha a marca (a cópia baixada, se houver, continua tocando).
-  for (const t of removed) await db.put('tracks', t.id, { ...t, removedFromDrive: true });
+  // Tirou do Drive = não quer mais: some da biblioteca e do celular (capas ficam, são por álbum).
+  for (const t of removed) {
+    await db.del('tracks', t.id);
+    await db.del('audio', t.id);
+  }
   await db.put('meta', 'lastSync', Date.now());
 
   onProgress({ phase: 'done' });
-  return { total: files.length, added: added.length, changed: changed.length, removed: removed.length };
+  return { total: files.length, added: added.length, changed: changed.length, removed: removed.length, removedIds: removed.map((t) => t.id) };
 }

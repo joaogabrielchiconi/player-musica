@@ -253,6 +253,7 @@ async function sync() {
       },
     });
     setOnline(true);
+    await offline.remove(r.removedIds); // tira da memória dos downloads (o arquivo já foi apagado)
     const n = await render();
     const changes = [r.added && `${r.added} nova(s)`, r.changed && `${r.changed} alterada(s)`, r.removed && `${r.removed} removida(s)`].filter(Boolean);
     setStatus(`${n} música(s)${changes.length ? ` · ${changes.join(', ')}` : ' · nada mudou'}`);
